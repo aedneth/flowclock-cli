@@ -1,0 +1,50 @@
+name: Bug report
+description: Report a problem with flowclock
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: Thanks for taking the time to file a bug! Please fill out the details below.
+  - type: input
+    id: version
+    attributes:
+      label: flowclock version
+      description: Output of `flowclock --version`
+      placeholder: 0.1.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options:
+        - Linux
+        - macOS
+        - Windows
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal / Node version
+      placeholder: "Kitty 0.35, Node 20.14"
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, what did you expect, and what happened instead?
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Run `flowclock ...`
+        2. ...
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `flowclock doctor --json`
+      render: json

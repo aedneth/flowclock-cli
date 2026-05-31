@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest an idea for flowclock
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before suggesting UI features, note flowclock's core principle: the HUD
+        stays a single centered line with invisible controls. Metrics belong in
+        logs/commands, not on the timer screen.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+  - type: checkboxes
+    id: agent-native
+    attributes:
+      label: Agent-native
+      options:
+        - label: This feature has (or needs) a non-interactive `--json` equivalent
