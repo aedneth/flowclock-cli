@@ -1,0 +1,14 @@
+# Publish only the build output (see package.json "files").
+# This is a belt-and-suspenders exclude list for everything else.
+src/
+test/
+docs/
+.github/
+*.config.ts
+*.config.js
+tsconfig.json
+.editorconfig
+.nvmrc
+.prettierrc.json
+.prettierignore
+coverage/

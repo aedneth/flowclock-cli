@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Security report
+    url: https://github.com/aedneth/flowclock-cli/security/advisories/new
+    about: Please report security vulnerabilities privately, not as public issues.
+  - name: Commercial licensing
+    url: mailto:eduardoa.borjas@gmail.com
+    about: Inquire about a commercial license to use flowclock without AGPL obligations.

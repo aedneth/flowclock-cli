@@ -1,0 +1,79 @@
+{
+  "name": "flowclock-cli",
+  "version": "0.1.0",
+  "description": "Flowtime count-up terminal timer (HUD, not Pomodoro) with silent session logging — agent-native, like gh and vercel.",
+  "type": "module",
+  "license": "AGPL-3.0-or-later",
+  "author": "Eduardo Borjas",
+  "homepage": "https://github.com/aedneth/flowclock-cli#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/aedneth/flowclock-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/aedneth/flowclock-cli/issues"
+  },
+  "keywords": [
+    "flowtime",
+    "timer",
+    "stopwatch",
+    "hud",
+    "cli",
+    "terminal",
+    "productivity",
+    "time-tracking",
+    "agent-native",
+    "mcp"
+  ],
+  "bin": {
+    "flowclock": "dist/cli.js"
+  },
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "LICENSE",
+    "LICENSE-COMMERCIAL",
+    "README.md",
+    "CHANGELOG.md"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:coverage": "vitest run --coverage",
+    "prepublishOnly": "npm run build"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "commander": "^13.1.0",
+    "env-paths": "^3.0.0",
+    "zod": "^3.25.0"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/node": "^20.14.0",
+    "@typescript-eslint/eslint-plugin": "^8.0.0",
+    "@typescript-eslint/parser": "^8.0.0",
+    "@vitest/coverage-v8": "^2.1.0",
+    "eslint": "^9.0.0",
+    "prettier": "^3.3.0",
+    "tsup": "^8.5.1",
+    "typescript": "^5.5.0",
+    "vitest": "^2.1.0"
+  }
+}
