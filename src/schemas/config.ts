@@ -1,0 +1,44 @@
+import { z } from "zod";
+
+/** Current on-disk schema version for the config file. */
+export const CONFIG_SCHEMA_VERSION = 1;
+
+export const ThemeNameSchema = z.enum(["neon", "amber", "blue", "mono"]);
+export type ThemeName = z.infer<typeof ThemeNameSchema>;
+
+export const KeybindingsSchema = z.object({
+  pause: z.string().length(1).default("p"),
+  reset: z.string().length(1).default("r"),
+  quit: z.string().length(1).default("q"),
+});
+export type Keybindings = z.infer<typeof KeybindingsSchema>;
+
+export const ConfigSchema = z.object({
+  schemaVersion: z
+    .literal(CONFIG_SCHEMA_VERSION)
+    .default(CONFIG_SCHEMA_VERSION),
+  theme: ThemeNameSchema.default("neon"),
+  keybindings: KeybindingsSchema.default({ pause: "p", reset: "r", quit: "q" }),
+  /** Override path for sessions.json. `null` = default data dir. */
+  sessionsPath: z.string().nullable().default(null),
+  /** Optional JSON push endpoint (v0.3.0). */
+  apiEndpoint: z.string().url().nullable().default(null),
+  /** Optional big ASCII display (v0.3.0). */
+  bigFont: z.boolean().default(false),
+});
+export type Config = z.infer<typeof ConfigSchema>;
+
+/** A fully-defaulted config object (parsing an empty object fills defaults). */
+export const DEFAULT_CONFIG: Config = ConfigSchema.parse({});
+
+/** Keys that `config set` is allowed to write, with their value parsers. */
+export const SETTABLE_KEYS = [
+  "theme",
+  "keybindings.pause",
+  "keybindings.reset",
+  "keybindings.quit",
+  "sessionsPath",
+  "apiEndpoint",
+  "bigFont",
+] as const;
+export type SettableKey = (typeof SETTABLE_KEYS)[number];

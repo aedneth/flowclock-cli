@@ -1,4 +1,8 @@
 node_modules/
 dist/
+coverage/
 .env
 .DS_Store
+
+# Private planning context — stripped before the public flip
+docs/planning/
