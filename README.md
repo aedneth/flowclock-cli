@@ -25,10 +25,17 @@ It started as a production-proven Bash HUD used daily; this is the
 cross-platform, agent-native rewrite that preserves that exact minimalist UX.
 
 ```
-                              00:42:17
+┌─────────────────────────────────────────────────┐
+│                                                 │
+│                                                 │
+│                    00:42:17                     │
+│                                                 │
+│                                                 │
+└─────────────────────────────────────────────────┘
 ```
 
 That's the whole screen. `p` pauses, `r` resets, `q` stops — all invisible.
+No clock face, no progress bar, no status text, no visible hint. Nothing competing for your attention.
 
 ## Install
 
@@ -95,6 +102,21 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 `theme` (`neon`·`amber`·`blue`·`mono`), `keybindings.{pause,reset,quit}`,
 `sessionsPath`, `apiEndpoint`, `bigFont`. Override locations with
 `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR`.
+
+## Roadmap
+
+| Version | Focus |
+| ------- | ----- |
+| **v0.1.0** ✅ | Core HUD, silent logging, `stats`/`history`/`config`/`doctor`, agent-native layer, MCP server, AGPL-3.0 + commercial |
+| **v0.2.0** | Goals mode (name a session before starting), rich `stats` with streaks, terminal GIF demo in README |
+| **v0.3.0** | `flowclock sync` — push `sessions.json` to a self-hosted or cloud endpoint |
+| **v1.0.0** | Stability guarantee on all `--json` schemas and exit codes; published to npm |
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md). The short version: branch from `main`, add
+tests, keep the HUD minimal, and make sure `npm run build && npm test && npm run
+lint && npm run typecheck` all pass before opening a PR.
 
 ## License
 
