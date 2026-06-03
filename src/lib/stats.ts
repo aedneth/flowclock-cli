@@ -14,6 +14,12 @@ export interface StatsSummary {
   allTimeCount: number;
   bestSessionS: number;
   averageSessionS: number;
+  /** Consecutive local days (ending today/yesterday) with ≥1 session. */
+  currentStreak: number;
+  /** Longest run of consecutive active days ever. */
+  longestStreak: number;
+  /** Local YYYY-MM-DD of the most recent session, or null if none. */
+  lastSessionDate: string | null;
   /** Last 7 local days, oldest → newest. */
   week: DayBucket[];
 }
@@ -24,6 +30,56 @@ function localDateKey(iso: string): string {
   const m = String(d.getMonth() + 1).padStart(2, "0");
   const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
+}
+
+/** Calendar-day index for a local YYYY-MM-DD key (for run-length math). */
+function dayNumber(key: string): number {
+  const [y, m, d] = key.split("-").map(Number);
+  return Math.floor(Date.UTC(y!, m! - 1, d!) / 86_400_000);
+}
+
+interface StreakResult {
+  current: number;
+  longest: number;
+  lastSessionDate: string | null;
+}
+
+/** Streaks over the set of local days that have ≥1 session. */
+export function computeStreaks(activeKeys: string[], now: Date): StreakResult {
+  if (activeKeys.length === 0) {
+    return { current: 0, longest: 0, lastSessionDate: null };
+  }
+  const days = [...new Set(activeKeys.map(dayNumber))].sort((a, b) => a - b);
+  const active = new Set(days);
+
+  let longest = 1;
+  let run = 1;
+  for (let i = 1; i < days.length; i++) {
+    run = days[i]! === days[i - 1]! + 1 ? run + 1 : 1;
+    if (run > longest) longest = run;
+  }
+
+  const todayNum = dayNumber(localDateKey(now.toISOString()));
+  // The streak is "current" if the most recent active day is today or yesterday.
+  let anchor: number | null = null;
+  if (active.has(todayNum)) anchor = todayNum;
+  else if (active.has(todayNum - 1)) anchor = todayNum - 1;
+
+  let current = 0;
+  if (anchor !== null) {
+    let cursor = anchor;
+    while (active.has(cursor)) {
+      current += 1;
+      cursor -= 1;
+    }
+  }
+
+  const lastNum = days[days.length - 1]!;
+  const lastSessionDate = activeKeys
+    .map((k) => ({ k, n: dayNumber(k) }))
+    .filter((x) => x.n === lastNum)[0]!.k;
+
+  return { current, longest, lastSessionDate };
 }
 
 /**
@@ -64,6 +120,8 @@ export function computeStats(
     week.push(byDay.get(key) ?? { date: key, totalS: 0, count: 0 });
   }
 
+  const streaks = computeStreaks([...byDay.keys()], now);
+
   return {
     todayTotalS,
     todayCount,
@@ -73,6 +131,9 @@ export function computeStats(
     averageSessionS: sessions.length
       ? Math.round(allTimeTotalS / sessions.length)
       : 0,
+    currentStreak: streaks.current,
+    longestStreak: streaks.longest,
+    lastSessionDate: streaks.lastSessionDate,
     week,
   };
 }

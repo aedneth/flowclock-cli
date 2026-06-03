@@ -104,13 +104,32 @@ export function buildManifest(): Manifest {
             description: "Attach a label to the session.",
           },
           {
+            name: "--goal",
+            type: "string",
+            description:
+              "Name the goal/intention; prompts hit/miss at stop (TTY).",
+          },
+          {
+            name: "--theme",
+            type: "string",
+            description: "Theme override for this session: neon|amber|blue|mono.",
+          },
+          {
+            name: "--big",
+            type: "boolean",
+            description: "Render the time in big 7-segment ASCII.",
+          },
+          {
             name: "--no-hud",
             type: "boolean",
             description: "Force headless (requires --duration).",
           },
         ],
         jsonData: "The logged Session record.",
-        examples: ["flowclock start", "flowclock start --duration 1500 --json"],
+        examples: [
+          "flowclock start",
+          "flowclock start --goal 'Deep work' --duration 1500 --json",
+        ],
       },
       {
         name: "log",
@@ -135,6 +154,16 @@ export function buildManifest(): Manifest {
             type: "string",
             description: "Comma-separated tags.",
           },
+          {
+            name: "--goal",
+            type: "string",
+            description: "Goal/intention for this session.",
+          },
+          {
+            name: "--recmp3-session-id",
+            type: "string",
+            description: "Correlating recmp3-cli session id (naming convention).",
+          },
         ],
         jsonData: "The stored Session record.",
         examples: ["flowclock log --duration 600 --label deep-work --json"],
@@ -151,7 +180,7 @@ export function buildManifest(): Manifest {
           },
         ],
         jsonData:
-          "StatsSummary { todayTotalS, todayCount, allTimeTotalS, allTimeCount, bestSessionS, averageSessionS, week[] }.",
+          "StatsSummary { todayTotalS, todayCount, allTimeTotalS, allTimeCount, bestSessionS, averageSessionS, currentStreak, longestStreak, lastSessionDate, week[] }.",
         examples: ["flowclock stats --json"],
       },
       {
@@ -174,6 +203,28 @@ export function buildManifest(): Manifest {
         examples: ["flowclock history --limit 10 --json"],
       },
       {
+        name: "summary",
+        summary:
+          "Markdown table of a week's sessions (Date|Sessions|Total|Best|Goal).",
+        flags: [
+          {
+            name: "--week",
+            type: "string",
+            description: "ISO week YYYY-WW to summarize (default: this week).",
+          },
+        ],
+        jsonData: "{ week, weekStart, days: [{ date, sessions, totalS, bestS, goal }] }.",
+        examples: ["flowclock summary --week 2026-23 --json"],
+      },
+      {
+        name: "goals",
+        summary:
+          "Your goals, learned from logged sessions, with hit/miss tallies.",
+        jsonData:
+          "{ count, goals: [{ goal, count, totalS, met, missed, neutral, lastUsed }] }.",
+        examples: ["flowclock goals --json"],
+      },
+      {
         name: "config",
         summary: "Read/write configuration.",
         args: ["<get|set|list|path>", "[key]", "[value]"],
@@ -194,6 +245,13 @@ export function buildManifest(): Manifest {
         summary: "Emit this command/tool manifest for agent discovery.",
         jsonData: "The Manifest object.",
         examples: ["flowclock manifest --json"],
+      },
+      {
+        name: "completion",
+        summary: "Print a shell completion script (bash|zsh|fish).",
+        args: ["<bash|zsh|fish>"],
+        jsonData: "{ shell, script }.",
+        examples: ["flowclock completion zsh"],
       },
       {
         name: "mcp",

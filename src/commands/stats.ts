@@ -30,6 +30,7 @@ export function runStats(ctx: CommandContext, opts: StatsOptions): void {
     `${c("All-time")}   ${humanDuration(summary.allTimeTotalS)}  (${summary.allTimeCount} session${summary.allTimeCount === 1 ? "" : "s"})`,
     `${c("Best")}       ${humanDuration(summary.bestSessionS)}`,
     `${c("Average")}    ${humanDuration(summary.averageSessionS)}`,
+    `${c("Streak")}     ${summary.currentStreak} day${summary.currentStreak === 1 ? "" : "s"} (best ${summary.longestStreak})`,
   ];
 
   // Weekly summary is always shown in human mode (overview: "+ weekly summary").

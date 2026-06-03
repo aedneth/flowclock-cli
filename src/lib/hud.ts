@@ -13,6 +13,8 @@ export const ANSI = {
   cursorTo: (row: number, col: number) => `\x1b[${row};${col}H`,
 };
 
+import { renderBigLines, bigWidth, BIG_ROWS, BIG_MIN_COLS } from "./bigfont.js";
+
 export interface FrameInput {
   rows: number;
   cols: number;
@@ -42,4 +44,30 @@ export function renderFrame(input: FrameInput): string {
     : time;
 
   return `${ANSI.clear}${ANSI.cursorTo(row, col)}${body}`;
+}
+
+/**
+ * Render one frame of the big 7-segment HUD. Returns "" when the window is too
+ * short or too narrow for the block font — the caller then falls back to
+ * `renderFrame` (compact), so `--big` degrades gracefully and never crashes.
+ */
+export function renderBigFrame(input: FrameInput): string {
+  const { rows, cols, time } = input;
+  if (!Number.isFinite(rows) || !Number.isFinite(cols)) return "";
+
+  const width = bigWidth(time);
+  // Fall back on narrow terminals (per spec) or when the block can't fit.
+  if (cols < BIG_MIN_COLS || cols < width || rows < BIG_ROWS) return "";
+
+  const lines = renderBigLines(time);
+  const topRow = Math.max(1, Math.floor((rows - BIG_ROWS) / 2) + 1);
+  const col = Math.max(1, Math.floor((cols - width) / 2) + 1);
+  const colorOn = input.colorOn ?? "";
+  const colorOff = input.colorOn ? (input.colorOff ?? ANSI.reset) : "";
+
+  let out = ANSI.clear;
+  lines.forEach((line, i) => {
+    out += ANSI.cursorTo(topRow + i, col) + colorOn + line + colorOff;
+  });
+  return out;
 }

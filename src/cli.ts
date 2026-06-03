@@ -11,6 +11,9 @@ import { runStart } from "./commands/start.js";
 import { runLog } from "./commands/log.js";
 import { runStats } from "./commands/stats.js";
 import { runHistory } from "./commands/history.js";
+import { runGoals } from "./commands/goals.js";
+import { runSummary } from "./commands/summary.js";
+import { runCompletion } from "./commands/completion.js";
 import { runConfig, type ConfigAction } from "./commands/config.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runManifest } from "./commands/manifest.js";
@@ -88,12 +91,18 @@ export function buildProgram(): Command {
         toInt,
       )
       .option("--label <text>", "attach a label to the session")
+      .option("--goal <text>", "name the goal/intention for this session")
+      .option("--theme <name>", "theme override: neon|amber|blue|mono")
+      .option("--big", "render the time in big ASCII (7-segment)")
       .option("--no-hud", "force headless (requires --duration)")
       .action((opts, cmd: Command) =>
         guard("start", cmd, (ctx) =>
           runStart(ctx, {
             duration: opts.duration,
             label: opts.label,
+            goal: opts.goal,
+            theme: opts.theme,
+            big: opts.big,
             noHud: opts.hud === false,
           }),
         ),
@@ -113,6 +122,8 @@ export function buildProgram(): Command {
       .option("--label <text>", "session label")
       .option("--note <text>", "session note")
       .option("--tags <csv>", "comma-separated tags")
+      .option("--goal <text>", "goal/intention for this session")
+      .option("--recmp3-session-id <id>", "correlating recmp3-cli session id")
       .action((opts, cmd: Command) =>
         guard("log", cmd, (ctx) => runLog(ctx, opts)),
       ),
@@ -168,6 +179,27 @@ export function buildProgram(): Command {
       ),
   );
 
+  // summary
+  addGlobalFlags(
+    program
+      .command("summary")
+      .description("markdown table of a week's sessions (for notes)")
+      .option("--week <YYYY-WW>", "ISO week to summarize (default: this week)")
+      .action((opts, cmd: Command) =>
+        guard("summary", cmd, (ctx) => runSummary(ctx, opts)),
+      ),
+  );
+
+  // goals
+  addGlobalFlags(
+    program
+      .command("goals")
+      .description("your goals, learned from logged sessions (with hit/miss)")
+      .action((_opts, cmd: Command) =>
+        guard("goals", cmd, (ctx) => runGoals(ctx)),
+      ),
+  );
+
   // doctor
   addGlobalFlags(
     program
@@ -185,6 +217,17 @@ export function buildProgram(): Command {
       .description("emit the command/tool manifest for agent discovery")
       .action((_opts, cmd: Command) =>
         guard("manifest", cmd, (ctx) => runManifest(ctx)),
+      ),
+  );
+
+  // completion
+  addGlobalFlags(
+    program
+      .command("completion")
+      .description("print a shell completion script (bash|zsh|fish)")
+      .argument("<shell>", "bash | zsh | fish")
+      .action((shell: string, _opts, cmd: Command) =>
+        guard("completion", cmd, (ctx) => runCompletion(ctx, shell)),
       ),
   );
 
