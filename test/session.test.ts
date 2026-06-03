@@ -62,6 +62,51 @@ describe("session store", () => {
     const { recoveredBackup } = readSessions(file);
     expect(recoveredBackup).toBeDefined();
   });
+
+  it("reads legacy schemaVersion 1 records non-destructively (v1→v2)", () => {
+    // A v1 record as written by flowclock-cli v0.1.0 — no goal fields.
+    const legacy = {
+      schemaVersion: 1,
+      id: "2026-05-01T10-00-00-000-abcd",
+      start: "2026-05-01T10:00:00.000Z",
+      end: "2026-05-01T10:01:00.000Z",
+      durationS: 60,
+      pauses: [],
+      label: null,
+      note: null,
+      source: "hud",
+      tags: [],
+    };
+    writeFileSync(file, JSON.stringify([legacy]));
+
+    const { sessions, recoveredBackup } = readSessions(file);
+    expect(recoveredBackup).toBeUndefined(); // not treated as corrupt
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]!.schemaVersion).toBe(1); // preserved, not forced to 2
+    expect(sessions[0]!.durationS).toBe(60);
+    // New v2 fields are filled with null defaults.
+    expect(sessions[0]!.goal).toBeNull();
+    expect(sessions[0]!.goalMet).toBeNull();
+    expect(sessions[0]!.recmp3SessionId).toBeNull();
+  });
+
+  it("writes new sessions at schemaVersion 2 with goal fields", () => {
+    const stored = appendSession(
+      file,
+      SessionSchema.parse({
+        id: makeSessionId(new Date("2026-06-01T10:00:00.000Z")),
+        start: "2026-06-01T10:00:00.000Z",
+        end: "2026-06-01T10:25:00.000Z",
+        durationS: 1500,
+        source: "log",
+        goal: "Deep work on StreamNet",
+      }),
+    );
+    expect(stored.schemaVersion).toBe(2);
+    expect(stored.goal).toBe("Deep work on StreamNet");
+    const { sessions } = readSessions(file);
+    expect(sessions[0]!.goal).toBe("Deep work on StreamNet");
+  });
 });
 
 describe("querySessions", () => {

@@ -13,6 +13,8 @@ export interface LogOptions {
   label?: string;
   note?: string;
   tags?: string;
+  goal?: string;
+  recmp3SessionId?: string;
 }
 
 /** Read all of stdin synchronously, or null if stdin is an interactive TTY. */
@@ -76,6 +78,8 @@ export function runLog(ctx: CommandContext, opts: LogOptions): void {
       note: opts.note ?? null,
       source: "log",
       tags: opts.tags ? opts.tags.split(",").map((t) => t.trim()) : [],
+      goal: opts.goal ?? null,
+      recmp3SessionId: opts.recmp3SessionId ?? null,
     });
   }
 
