@@ -1,0 +1,30 @@
+name: Security Audit
+
+on:
+  schedule:
+    - cron: '0 9 * * 1'  # Every Monday 09:00 UTC
+  workflow_dispatch:      # Manual trigger
+
+permissions: {}
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020  # v4.4.0
+        with:
+          node-version: '22'
+
+      - name: Install dependencies (zero-trust)
+        run: npm ci --ignore-scripts
+
+      # Weekly audit catches moderate/low that are non-blocking in CI.
+      # Fail on moderate or above — gives 7 days to assess before next push.
+      - name: Full dependency audit
+        run: npm audit --audit-level=moderate

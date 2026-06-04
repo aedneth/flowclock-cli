@@ -1,4 +1,9 @@
-import type { Pause, Session, SessionSource } from "../schemas/session.js";
+import {
+  SESSION_SCHEMA_VERSION,
+  type Pause,
+  type Session,
+  type SessionSource,
+} from "../schemas/session.js";
 import { makeSessionId } from "./session.js";
 
 /** Injectable clock returning epoch milliseconds (Date.now by default). */
@@ -88,6 +93,9 @@ export class Timer {
     label?: string | null;
     note?: string | null;
     tags?: string[];
+    goal?: string | null;
+    goalMet?: boolean | null;
+    recmp3SessionId?: string | null;
   }): Session {
     const now = this.clock();
     const pauses = [...this.pauses];
@@ -107,7 +115,7 @@ export class Timer {
     );
     const startDate = new Date(this.startMs);
     return {
-      schemaVersion: 1,
+      schemaVersion: SESSION_SCHEMA_VERSION,
       id: makeSessionId(startDate),
       start: startDate.toISOString(),
       end: new Date(now).toISOString(),
@@ -117,6 +125,9 @@ export class Timer {
       note: opts.note ?? null,
       source: opts.source,
       tags: opts.tags ?? [],
+      goal: opts.goal ?? null,
+      goalMet: opts.goalMet ?? null,
+      recmp3SessionId: opts.recmp3SessionId ?? null,
     };
   }
 }

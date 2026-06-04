@@ -51,9 +51,14 @@ Alacritty, Windows Terminal, GNOME Terminal, …).
 ```bash
 flowclock                 # start the HUD (default command)
 flowclock start           # the same, explicitly
-flowclock stats           # today total, count, best, average + last 7 days
+flowclock start --goal "Deep work on StreamNet"   # name your intention
+flowclock start --big     # big 7-segment display (compact fallback if narrow)
+flowclock stats           # today total, count, best, average, streak + last 7 days
 flowclock history         # session history, newest first
+flowclock goals           # your goals, with met/missed tallies
+flowclock summary --week  # markdown table of this week (paste into notes)
 flowclock config list     # view configuration
+flowclock completion zsh  # print a shell completion script (bash|zsh|fish)
 flowclock doctor          # verify your installation
 ```
 
@@ -62,6 +67,51 @@ flowclock doctor          # verify your installation
 
 Sessions are appended silently to `sessions.json` under your platform's data
 directory (XDG on Linux). Nothing is ever printed over the timer.
+
+## Goals, streaks & themes
+
+Name what you're sitting down to do and flowclock keeps score — quietly.
+
+```bash
+flowclock start --goal "Write the v1 launch post"
+# … focus … then press q. If you set a goal, a 3-second y/n prompt asks whether
+# you met it (skip = neutral, it never blocks your quit).
+```
+
+- **`flowclock goals`** rolls those up: time spent and how often you hit each one.
+- **`flowclock stats`** shows your **current and longest daily streak** — one
+  session a day keeps it alive (today or yesterday counts as current).
+- **Themes:** `neon` (default), `amber`, `blue`, `mono`. Set the default with
+  `flowclock config set theme amber`, or override per session with
+  `flowclock start --theme blue`.
+- **`flowclock start --big`** renders the clock in a block font:
+
+```
+████   █    ████ ████   █  █ ████
+█  █  ██  █    █    █ █ █  █ █
+█  █   █    ████  ███   ████ ████
+█  █   █  █ █       █ █    █    █
+████  ███   ████ ████      █ ████
+```
+
+On a terminal narrower than 60 columns it falls back to the compact HUD —
+never partial garbage.
+
+### Weekly summary for your notes
+
+```bash
+flowclock summary --week            # this week
+flowclock summary --week 2026-23    # a specific ISO week
+```
+
+```markdown
+### Week 2026-W23
+
+| Date | Sessions | Total | Best | Goal |
+| ---- | -------- | ----- | ---- | ---- |
+| 2026-06-03 | 3 | 2h 10m 00s | 1h 05m 00s | Write the v1 launch post |
+| **Total** | **3** | **2h 10m 00s** | | |
+```
 
 ## Agent-native by design
 
@@ -108,9 +158,9 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 | Version | Focus |
 | ------- | ----- |
 | **v0.1.0** ✅ | Core HUD, silent logging, `stats`/`history`/`config`/`doctor`, agent-native layer, MCP server, AGPL-3.0 + commercial |
-| **v0.2.0** | Goals mode (name a session before starting), rich `stats` with streaks, terminal GIF demo in README |
-| **v0.3.0** | `flowclock sync` — push `sessions.json` to a self-hosted or cloud endpoint |
-| **v1.0.0** | Stability guarantee on all `--json` schemas and exit codes; published to npm |
+| **v1.0.0** ✅ | Goals mode, daily streaks, theme override + `--big` display, weekly markdown export, shell completions, recmp3 correlation, schema v2 |
+| **v1.1.0** | `flowclock sync` — push `sessions.json` to a self-hosted or cloud endpoint; terminal GIF demo in README |
+| **later** | Recurring/scheduled goals, richer per-goal analytics, Homebrew tap |
 
 ## Contributing
 
