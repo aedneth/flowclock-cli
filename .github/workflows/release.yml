@@ -30,11 +30,14 @@ jobs:
       - name: Dependency security audit
         run: npm audit --audit-level=high
 
-      - name: Lint, typecheck, test
-        run: npm run lint && npm run typecheck && npm test
+      - name: Lint and typecheck
+        run: npm run lint && npm run typecheck
 
       - name: Build
         run: npm run build
+
+      - name: Test
+        run: npm test
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65  # v2
