@@ -11,14 +11,17 @@ describe("manifest", () => {
     const names = m.commands.map((c) => c.name).sort();
     expect(names).toEqual(
       [
+        "completion",
         "config",
         "doctor",
+        "goals",
         "history",
         "log",
         "manifest",
         "mcp",
         "start",
         "stats",
+        "summary",
       ].sort(),
     );
   });

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { colorEnabled, paint } from "../src/lib/theme.js";
+import { colorEnabled, paint, colorDepth } from "../src/lib/theme.js";
 import { humanDuration } from "../src/lib/format.js";
 
 describe("colorEnabled", () => {
@@ -29,6 +29,30 @@ describe("colorEnabled", () => {
         env: {} as NodeJS.ProcessEnv,
       }),
     ).toBe(false);
+  });
+});
+
+describe("colorDepth", () => {
+  const env = (o: Record<string, string>) => o as NodeJS.ProcessEnv;
+  it("reports truecolor from COLORTERM", () => {
+    expect(colorDepth(env({ COLORTERM: "truecolor", TERM: "xterm" }))).toBe(
+      "truecolor",
+    );
+  });
+  it("reports 256 from TERM", () => {
+    expect(colorDepth(env({ TERM: "xterm-256color" }))).toBe("256");
+  });
+  it("reports basic for a plain TERM", () => {
+    expect(colorDepth(env({ TERM: "xterm" }))).toBe("basic");
+  });
+  it("reports none for NO_COLOR", () => {
+    expect(colorDepth(env({ NO_COLOR: "1", TERM: "xterm-256color" }))).toBe(
+      "none",
+    );
+  });
+  it("reports none for a dumb/empty terminal", () => {
+    expect(colorDepth(env({ TERM: "dumb" }))).toBe("none");
+    expect(colorDepth(env({}))).toBe("none");
   });
 });
 

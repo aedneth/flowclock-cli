@@ -4,6 +4,7 @@ import { mkdtempSync, rmSync, existsSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { VERSION } from "../src/version.js";
 
 const CLI = fileURLToPath(new URL("../dist/cli.js", import.meta.url));
 let home: string;
@@ -57,7 +58,7 @@ function run(args: string[], input?: string): Run {
 
 describe("flowclock CLI", () => {
   it("prints version", () => {
-    expect(run(["--version"]).stdout.trim()).toBe("0.1.0");
+    expect(run(["--version"]).stdout.trim()).toBe(VERSION);
   });
 
   it("emits a manifest with all commands", () => {
@@ -110,5 +111,45 @@ describe("flowclock CLI", () => {
     const r = run(["start", "--duration", "0", "--no-hud", "--json"]);
     expect(r.status).toBe(0);
     expect(JSON.parse(r.stdout).data.source).toBe("timed");
+  });
+
+  it("logs a goal and rolls it up in goals", () => {
+    expect(
+      run(["log", "--duration", "1500", "--goal", "Ship v1", "--json"]).status,
+    ).toBe(0);
+    const goals = JSON.parse(run(["goals", "--json"]).stdout);
+    expect(goals.data.count).toBe(1);
+    expect(goals.data.goals[0].goal).toBe("Ship v1");
+    expect(goals.data.goals[0].totalS).toBe(1500);
+  });
+
+  it("reports streak fields in stats", () => {
+    run(["log", "--duration", "600", "--json"]);
+    const stats = JSON.parse(run(["stats", "--json"]).stdout);
+    expect(stats.data.currentStreak).toBe(1);
+    expect(stats.data).toHaveProperty("longestStreak");
+    expect(stats.data).toHaveProperty("lastSessionDate");
+  });
+
+  it("emits a markdown week summary and rejects a bad week", () => {
+    const md = run(["summary", "--week", "2026-23"]);
+    expect(md.status).toBe(0);
+    expect(md.stdout).toContain("| Date | Sessions | Total | Best | Goal |");
+    expect(run(["summary", "--week", "garbage"]).status).toBe(2);
+  });
+
+  it("prints completion scripts and rejects an unknown shell", () => {
+    for (const shell of ["bash", "zsh", "fish"]) {
+      const r = run(["completion", shell]);
+      expect(r.status).toBe(0);
+      expect(r.stdout).toContain("flowclock");
+    }
+    expect(run(["completion", "powershell"]).status).toBe(2);
+  });
+
+  it("rejects an unknown --theme on start (USAGE)", () => {
+    expect(run(["start", "--theme", "purple", "--duration", "0"]).status).toBe(
+      2,
+    );
   });
 });

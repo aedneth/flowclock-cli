@@ -5,6 +5,8 @@ import { readSessions } from "../lib/session.js";
 import { sessionsPathFor } from "../lib/config.js";
 import { jsonSuccess, printJson } from "../lib/output.js";
 import { ExitCode } from "../lib/exit.js";
+import { colorDepth } from "../lib/theme.js";
+import { detectShell } from "./completion.js";
 
 export interface Check {
   name: string;
@@ -63,6 +65,25 @@ function checkTTY(ctx: CommandContext): Check {
   };
 }
 
+function checkShell(ctx: CommandContext): Check {
+  const shell = detectShell(ctx.env);
+  // Informational: always ok, just a setup hint.
+  const detail = shell
+    ? `${shell} detected — enable completion: flowclock completion ${shell}`
+    : "shell not detected ($SHELL); completion available: bash|zsh|fish";
+  return { name: "shell-completion", ok: true, detail };
+}
+
+function checkColor(ctx: CommandContext): Check {
+  const depth = colorDepth(ctx.env);
+  // Informational: lacking 256-color is never a failure, just lower fidelity.
+  const detail =
+    depth === "none"
+      ? "color disabled (NO_COLOR or unknown TERM) — themes render plain"
+      : `${depth} color — theme '${ctx.config.theme}' supported`;
+  return { name: "color-support", ok: true, detail };
+}
+
 export function runDoctor(ctx: CommandContext): ExitCode {
   const sessionsFile = sessionsPathFor(ctx.config, ctx.paths);
   const checks: Check[] = [
@@ -71,6 +92,8 @@ export function runDoctor(ctx: CommandContext): ExitCode {
     checkWritable(ctx.paths.dataDir, "data-dir"),
     checkSessions(sessionsFile),
     checkTTY(ctx),
+    checkColor(ctx),
+    checkShell(ctx),
   ];
 
   const allOk = checks.every((c) => c.ok);

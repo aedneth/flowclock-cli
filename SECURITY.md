@@ -1,29 +1,38 @@
 # Security Policy
 
-## Supported versions
+## Supported Versions
 
-flowclock is pre-1.0; security fixes land on the latest released `0.x` line.
+| Version | Supported |
+|---------|-----------|
+| latest  | ✅        |
+| < latest | ❌ — update to latest |
 
-| Version      | Supported |
-| ------------ | --------- |
-| latest `0.x` | ✅        |
-| older        | ❌        |
+## Reporting a Vulnerability
 
-## Reporting a vulnerability
+**Do not open a public GitHub issue for security vulnerabilities.**
 
-Please report security issues **privately** — do not open a public issue or PR.
+Email: eduardoa.borjas@gmail.com
 
-- Preferred: open a [GitHub private security advisory](https://github.com/aedneth/flowclock-cli/security/advisories/new).
-- Or email: **eduardoa.borjas@gmail.com** with the subject `flowclock security`.
+Include:
+- Description of the vulnerability
+- Steps to reproduce
+- Potential impact
+- Any suggested fix (optional)
 
-Include reproduction steps, affected version, and impact. You'll get an
-acknowledgement within a few days. Please give a reasonable window to fix and
-release before any public disclosure.
+You will receive a response within 48 hours. If confirmed, a patch will be released within 7 days.
 
-## Scope notes
+## Supply Chain Security
 
-flowclock reads and writes local files only (config + `sessions.json`) and, when
-run, an optional MCP stdio server. It makes no network calls by default. The
-optional `apiEndpoint` config (future) would be the only outbound path and is
-opt-in. Reports about local file handling, the MCP tool surface, or dependency
-vulnerabilities are all in scope.
+This project implements zero-trust npm security:
+
+- **`ignore-scripts=true`** in `.npmrc` — blocks all postinstall/preinstall lifecycle scripts during `npm install`/`npm ci`. Prevents supply chain attacks via compromised transitive dependencies.
+- **Explicit native module whitelist** — only named, reviewed native modules (listed in CI) are allowed to compile. All others are blocked.
+- **Pinned GitHub Actions** — all Actions are pinned to a specific commit SHA, not a mutable tag. This prevents compromised Action tags from injecting malicious steps.
+- **`npm publish --provenance`** — every published release includes a signed SLSA attestation linking the package to the exact GitHub Actions run that built it. Verify with: `npm audit signatures <package>@<version>`
+- **`npm ci` in all CI jobs** — never `npm install`. Enforces exact cryptographic hash matching against `package-lock.json`.
+- **Minimum permissions** — each CI job declares only the permissions it needs. Default is `permissions: {}` (deny all).
+- **Weekly automated audit** — the Security Audit workflow runs every Monday at 09:00 UTC and fails on any moderate or higher vulnerability.
+
+## Known Mitigations
+
+Any known vulnerability mitigations (e.g., transitive dependency overrides) are documented in the relevant CI workflow files with inline comments.

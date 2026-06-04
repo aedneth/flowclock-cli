@@ -33,7 +33,10 @@ export function runHistory(ctx: CommandContext, opts: HistoryOptions): void {
     const when = new Date(s.start).toLocaleString();
     const dur = humanDuration(s.durationS).padStart(12);
     const label = s.label ? `  ${s.label}` : "";
-    return `${when}  ${dur}  [${s.source}]${label}`;
+    const goal = s.goal
+      ? `  🎯 ${s.goal}${s.goalMet === true ? " ✓" : s.goalMet === false ? " ✗" : ""}`
+      : "";
+    return `${when}  ${dur}  [${s.source}]${label}${goal}`;
   });
   process.stdout.write(lines.join("\n") + "\n");
 }

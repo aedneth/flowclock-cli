@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { computeStats } from "../src/lib/stats.js";
+import { computeStats, computeStreaks } from "../src/lib/stats.js";
 import { SessionSchema, type Session } from "../src/schemas/session.js";
 
 function s(durationS: number, start: string): Session {
@@ -50,5 +50,59 @@ describe("computeStats", () => {
     const r = computeStats([], now);
     expect(r.week[6]!.date).toBe("2026-05-31");
     expect(r.week[0]!.date).toBe("2026-05-25");
+  });
+});
+
+describe("computeStreaks", () => {
+  // Build a local YYYY-MM-DD key for `now` shifted by `offsetDays` — mirrors
+  // how computeStats derives day keys, so the test is timezone-robust.
+  const now = new Date("2026-05-31T12:00:00.000Z");
+  function key(offsetDays: number): string {
+    const d = new Date(now);
+    d.setDate(d.getDate() + offsetDays);
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
+
+  it("is zero with no active days (first run)", () => {
+    expect(computeStreaks([], now)).toEqual({
+      current: 0,
+      longest: 0,
+      lastSessionDate: null,
+    });
+  });
+
+  it("counts a current streak ending today", () => {
+    const r = computeStreaks([key(0), key(-1), key(-2)], now);
+    expect(r.current).toBe(3);
+    expect(r.longest).toBe(3);
+    expect(r.lastSessionDate).toBe(key(0));
+  });
+
+  it("keeps the streak current when the last active day was yesterday", () => {
+    const r = computeStreaks([key(-1), key(-2)], now);
+    expect(r.current).toBe(2);
+  });
+
+  it("breaks the current streak after a gap but keeps longest", () => {
+    // active: today, then a 3-day run two weeks ago
+    const r = computeStreaks([key(0), key(-10), key(-11), key(-12)], now);
+    expect(r.current).toBe(1); // only today is current
+    expect(r.longest).toBe(3); // the old run
+  });
+
+  it("returns current 0 when the most recent active day is stale", () => {
+    const r = computeStreaks([key(-5), key(-6)], now);
+    expect(r.current).toBe(0);
+    expect(r.longest).toBe(2);
+    expect(r.lastSessionDate).toBe(key(-5));
+  });
+
+  it("dedupes multiple sessions on the same day", () => {
+    const r = computeStreaks([key(0), key(0), key(-1)], now);
+    expect(r.current).toBe(2);
+    expect(r.longest).toBe(2);
   });
 });

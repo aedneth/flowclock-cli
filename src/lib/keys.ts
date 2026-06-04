@@ -50,3 +50,42 @@ export function startKeyReader(
     input.pause();
   };
 }
+
+/**
+ * Read a single yes/no keypress for the end-of-session goal prompt.
+ * Resolves `true` on y/Y, `false` on n/N, and `null` on any other key, Enter,
+ * Ctrl-C, or after `timeoutMs` (skip = neutral, never blocks a quit). Leaves the
+ * terminal raw mode the way it found it.
+ */
+export function readGoalOutcome(
+  input: NodeJS.ReadStream,
+  opts: { timeoutMs: number } = { timeoutMs: 3000 },
+): Promise<boolean | null> {
+  return new Promise((resolve) => {
+    const wasRaw = input.isRaw ?? false;
+    let done = false;
+
+    const finish = (value: boolean | null) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      input.off("data", onData);
+      if (input.isTTY) input.setRawMode(wasRaw);
+      input.pause();
+      resolve(value);
+    };
+
+    const onData = (chunk: string) => {
+      const ch = chunk[0] ?? "";
+      if (ch === "y" || ch === "Y") finish(true);
+      else if (ch === "n" || ch === "N") finish(false);
+      else finish(null); // Enter, Ctrl-C, anything else → skip
+    };
+
+    if (input.isTTY) input.setRawMode(true);
+    input.resume();
+    input.setEncoding("utf8");
+    input.on("data", onData);
+    const timer = setTimeout(() => finish(null), opts.timeoutMs);
+  });
+}
