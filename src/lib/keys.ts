@@ -5,12 +5,20 @@ export interface KeyHandlers {
   onReset: () => void;
   /** Called for `q` and Ctrl-C alike — both are a normal stop+log. */
   onQuit: () => void;
+  /** Toggle break on/off (`b` by default). */
+  onBreak: () => void;
+  /** Cycle break category while on break (`c` by default). */
+  onCategory: () => void;
+  /** Digit 1–6 pressed (pick break category or start categorized break). */
+  onDigit: (n: number) => void;
 }
 
 export interface Keybindings {
   pause: string;
   reset: string;
   quit: string;
+  break: string;
+  category: string;
 }
 
 const CTRL_C = "\u0003"; // Ctrl-C
@@ -39,6 +47,9 @@ export function startKeyReader(
       }
       if (ch === bindings.pause) handlers.onPause();
       else if (ch === bindings.reset) handlers.onReset();
+      else if (ch === bindings.break) handlers.onBreak();
+      else if (ch === bindings.category) handlers.onCategory();
+      else if (ch >= "1" && ch <= "6") handlers.onDigit(Number(ch));
     }
   };
 

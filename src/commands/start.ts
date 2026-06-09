@@ -1,13 +1,15 @@
 import type { CommandContext } from "../lib/context.js";
 import { Timer } from "../lib/timer.js";
-import { renderFrame, renderBigFrame, ANSI } from "../lib/hud.js";
+import { renderHud, ANSI } from "../lib/hud.js";
 import { startKeyReader, readGoalOutcome } from "../lib/keys.js";
 import { appendSession } from "../lib/session.js";
 import { sessionsPathFor } from "../lib/config.js";
 import { THEME_FG } from "../lib/theme.js";
 import { jsonSuccess, printJson } from "../lib/output.js";
 import { ExitCode, fail } from "../lib/exit.js";
-import type { Session, SessionSource } from "../schemas/session.js";
+import { humanDuration } from "../lib/format.js";
+import { suggestBreakS } from "../lib/flowtime.js";
+import type { Session, SessionSource, BreakCategory } from "../schemas/session.js";
 import { ThemeNameSchema, type ThemeName } from "../schemas/config.js";
 
 export interface StartOptions {
@@ -21,9 +23,25 @@ export interface StartOptions {
   big?: boolean;
   /** Force headless (no HUD) even in a TTY. */
   noHud?: boolean;
+  /** Focus target in seconds (`--target`). */
+  target?: number;
+  /** Break budget in seconds (`--break-budget`). */
+  breakBudget?: number;
+  /** Minimal HUD: clock only (`--zen`). */
+  zen?: boolean;
 }
 
 const TICK_MS = 100; // matches flowtime.sh `sleep 0.1`
+
+/** Ordered break categories — digit keys 1..6 map to this array. */
+const BREAK_CATEGORIES: BreakCategory[] = [
+  "rest",
+  "meal",
+  "exercise",
+  "walk",
+  "distraction",
+  "other",
+];
 
 export async function runStart(
   ctx: CommandContext,
@@ -73,12 +91,14 @@ async function runHeadless(
       source: "timed",
       label: opts.label ?? null,
       goal: opts.goal ?? null,
+      focusTargetS: opts.target ?? null,
+      breakBudgetS: opts.breakBudget ?? null,
     }),
   );
   return stored;
 }
 
-/** Interactive HUD: single centered HH:MM:SS, invisible p/r/q controls. */
+/** Interactive HUD: Flowtime session with break support + controls footer. */
 function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
   return new Promise<Session>((resolve) => {
     const out = process.stdout;
@@ -86,19 +106,32 @@ function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
     const source: SessionSource = opts.duration ? "timed" : "hud";
     const theme: ThemeName = (opts.theme as ThemeName) ?? ctx.config.theme;
     const colorOn = ctx.color ? THEME_FG[theme] : undefined;
-    const big = opts.big ?? ctx.config.bigFont;
+    const style =
+      opts.big ?? ctx.config.bigFont ? "block" : ctx.config.displayStyle;
+    const zen = !!opts.zen;
+    const showControls = zen ? false : ctx.config.showControls;
 
     const render = () => {
-      const dims = {
+      const frame = renderHud({
         rows: out.rows ?? 0,
         cols: out.columns ?? 0,
         time: timer.display(),
+        style,
         colorOn,
         colorOff: ANSI.reset,
-      };
-      // --big renders the block font, but transparently falls back to the
-      // compact HUD when the terminal is too small (renderBigFrame → "").
-      const frame = (big && renderBigFrame(dims)) || renderFrame(dims);
+        zen,
+        showControls,
+        onBreak: timer.isOnBreak,
+        focusS: timer.elapsedS(),
+        totalBreakS: timer.totalBreakS(),
+        currentBreakS: timer.currentBreakS(),
+        breakCategory: timer.currentBreakCategory,
+        suggestedBreakS: suggestBreakS(timer.elapsedS()),
+        goal: opts.goal ?? null,
+        focusTargetS: opts.target ?? null,
+        breakBudgetS: opts.breakBudget ?? null,
+        keybindings: ctx.config.keybindings,
+      });
       if (frame) out.write(frame);
     };
 
@@ -114,13 +147,19 @@ function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
       stopKeys();
       process.off("SIGTERM", finish);
 
+      // End any open break so toSession() gets the final totals.
+      if (timer.isOnBreak) timer.endBreak();
+
+      // End-of-session summary (TTY && !headless && !json && !yes).
+      if (ctx.isTTY && !ctx.json) {
+        out.write(ANSI.showCursor + ANSI.clear);
+        writeSummary(out, timer, opts, colorOn ?? "");
+      }
+
       // Optional, non-blocking goal hit/miss prompt (3s auto-skip = neutral).
       let goalMet: boolean | null = null;
       if (opts.goal && ctx.isTTY && !ctx.yes) {
-        out.write(ANSI.showCursor + ANSI.clear);
-        out.write(
-          `Goal: ${opts.goal}\r\nDid you meet it? [y/n] (auto-skip in 3s) `,
-        );
+        out.write(`\r\nGoal: ${opts.goal}\r\nDid you meet it? [y/n] (auto-skip in 3s) `);
         goalMet = await readGoalOutcome(process.stdin, { timeoutMs: 3000 });
       }
 
@@ -132,6 +171,8 @@ function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
           label: opts.label ?? null,
           goal: opts.goal ?? null,
           goalMet,
+          focusTargetS: opts.target ?? null,
+          breakBudgetS: opts.breakBudget ?? null,
         }),
       );
       resolve(stored);
@@ -156,6 +197,32 @@ function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
         timer.togglePause();
         render();
       },
+      onBreak: () => {
+        if (timer.isOnBreak) {
+          timer.endBreak();
+        } else {
+          timer.startBreak("rest", null, suggestBreakS(timer.elapsedS()));
+        }
+        render();
+      },
+      onDigit: (n: number) => {
+        const cat = BREAK_CATEGORIES[n - 1];
+        if (!cat) return;
+        if (timer.isOnBreak) {
+          timer.setBreakCategory(cat);
+        } else {
+          timer.startBreak(cat, null, suggestBreakS(timer.elapsedS()));
+        }
+        render();
+      },
+      onCategory: () => {
+        if (!timer.isOnBreak) return;
+        const current = timer.currentBreakCategory;
+        const idx = BREAK_CATEGORIES.indexOf(current);
+        const next = BREAK_CATEGORIES[(idx + 1) % BREAK_CATEGORIES.length] ?? "rest";
+        timer.setBreakCategory(next);
+        render();
+      },
       onReset: () => {
         timer.reset();
         render();
@@ -164,4 +231,54 @@ function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
       onQuit: finish,
     });
   });
+}
+
+/** Write an end-of-session summary block to stdout. */
+function writeSummary(
+  out: NodeJS.WriteStream,
+  timer: Timer,
+  opts: StartOptions,
+  colorOn: string,
+): void {
+  const focusS = timer.elapsedS();
+  const totalBreakS = timer.totalBreakS();
+  const reset = colorOn ? ANSI.reset : "";
+
+  out.write(`${colorOn}── Session Summary ──${reset}\r\n`);
+  out.write(`  Focus total:  ${humanDuration(focusS)}\r\n`);
+  out.write(`  Break total:  ${humanDuration(totalBreakS)}\r\n`);
+
+  // Per-category breakdown — we need to reconstruct from session snapshot
+  // Use a temporary toSession to read the closed breaks list.
+  const snap = timer.toSession({ source: "hud" });
+  if (snap.breaks.length > 0) {
+    const byCategory = new Map<BreakCategory, number>();
+    for (const b of snap.breaks) {
+      byCategory.set(b.category, (byCategory.get(b.category) ?? 0) + b.durationS);
+    }
+    for (const [cat, s] of byCategory) {
+      out.write(`    ${cat}: ${humanDuration(s)}\r\n`);
+    }
+  }
+
+  if (focusS > 0 && totalBreakS > 0) {
+    const ratio = totalBreakS / focusS;
+    out.write(`  Focus:rest ratio: 1:${ratio.toFixed(1)}\r\n`);
+  }
+
+  if (opts.target != null) {
+    const met = focusS >= opts.target;
+    out.write(
+      `  Target (${humanDuration(opts.target)}): ${met ? "✓ met" : "✗ not met"}\r\n`,
+    );
+  }
+
+  if (opts.breakBudget != null) {
+    const ok = totalBreakS <= opts.breakBudget;
+    out.write(
+      `  Break budget (${humanDuration(opts.breakBudget)}): ${ok ? "✓ within budget" : "✗ over budget"}\r\n`,
+    );
+  }
+
+  out.write("\r\n");
 }

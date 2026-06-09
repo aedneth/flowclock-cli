@@ -103,6 +103,23 @@ export class Timer {
     return this.breakCategory;
   }
 
+  /**
+   * Change the category of the current in-progress break.
+   * No-op if not currently on break.
+   */
+  setBreakCategory(category: BreakCategory): void {
+    if (!this.onBreak) return;
+    this.breakCategory = category;
+  }
+
+  /**
+   * Total break seconds accumulated so far (closed breaks + current open break).
+   * Mirrors the elapsedS() pattern: always reflects the live total.
+   */
+  totalBreakS(): number {
+    return Math.floor(this.totalBreakMs / 1000) + this.currentBreakS();
+  }
+
   /** Reset to zero and clear break state — the `r` control. */
   reset(): void {
     this.startMs = this.clock();
