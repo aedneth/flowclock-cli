@@ -84,6 +84,37 @@ function checkColor(ctx: CommandContext): Check {
   return { name: "color-support", ok: true, detail };
 }
 
+function checkDashboard(ctx: CommandContext): Check {
+  if (!ctx.isTTY) {
+    return {
+      name: "dashboard-capability",
+      ok: true,
+      detail:
+        "no TTY (dashboard runs interactively; use --json for a snapshot)",
+    };
+  }
+  const cols = process.stdout.columns;
+  const rows = process.stdout.rows;
+  const colsOk = cols === undefined || cols >= 60;
+  const rowsOk = rows === undefined || rows >= 15;
+  const sizeStr =
+    cols !== undefined && rows !== undefined
+      ? `${cols}×${rows}`
+      : "unknown size";
+  if (colsOk && rowsOk) {
+    return {
+      name: "dashboard-capability",
+      ok: true,
+      detail: `TTY present, terminal ${sizeStr} — dashboard available`,
+    };
+  }
+  return {
+    name: "dashboard-capability",
+    ok: true,
+    detail: `TTY present but terminal ${sizeStr} is small (recommend ≥60×15) — dashboard may wrap`,
+  };
+}
+
 export function runDoctor(ctx: CommandContext): ExitCode {
   const sessionsFile = sessionsPathFor(ctx.config, ctx.paths);
   const checks: Check[] = [
@@ -94,6 +125,7 @@ export function runDoctor(ctx: CommandContext): ExitCode {
     checkTTY(ctx),
     checkColor(ctx),
     checkShell(ctx),
+    checkDashboard(ctx),
   ];
 
   const allOk = checks.every((c) => c.ok);

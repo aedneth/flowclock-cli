@@ -71,7 +71,7 @@ function zshScript(): string {
 }
 
 function fishScript(): string {
-  const subs = "start log stats history summary goals config doctor manifest mcp completion";
+  const subs = "start log stats history summary goals config doctor dashboard manifest mcp completion";
   const lines = commandInfos()
     .map(
       (c) =>
