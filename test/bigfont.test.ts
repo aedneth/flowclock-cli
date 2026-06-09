@@ -44,17 +44,17 @@ describe("computeScale", () => {
     expect(computeScale(60, 10, "00:00:00")).toBe(1);
   });
 
-  it("returns 2 for an 80-col 20-row terminal", () => {
-    // 80/33=2, 20/5=4 → 2
-    expect(computeScale(80, 20, "00:00:00")).toBe(2);
+  it("returns 2 for a 100-col 30-row terminal", () => {
+    // (100*0.75)/33=2, (30*0.50)/5=3 → 2
+    expect(computeScale(100, 30, "00:00:00")).toBe(2);
   });
 
-  it("caps at 10 for very large terminals", () => {
-    expect(computeScale(9999, 9999, "00:00:00")).toBe(10);
+  it("caps at 3 for very large terminals", () => {
+    expect(computeScale(9999, 9999, "00:00:00")).toBe(3);
   });
 
   it("is height-limited when rows is the binding constraint", () => {
-    // 200/33=6 (width allows 6), but 6/5=1 (height only fits scale 1)
+    // (200*0.75)/33=4 (width allows 4), but (6*0.50)/5=0 → clamped to 1 (height-bound)
     expect(computeScale(200, 6, "00:00:00")).toBe(1);
   });
 });

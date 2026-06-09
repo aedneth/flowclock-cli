@@ -50,8 +50,8 @@ export function renderFrame(input: FrameInput): string {
  * Render one frame of the big 7-segment HUD. Returns "" when the window is too
  * short or too narrow for the block font — the caller then falls back to
  * `renderFrame` (compact), so `--big` degrades gracefully and never crashes.
- * The font scales up to fill the terminal: a 200-col terminal gets 6× digits,
- * an 80-col terminal gets 2×, etc. Re-fires on every `resize` event in start.ts.
+ * The font scales up to ~75% of terminal width and ~50% of height (cap 3×) so
+ * the clock stays prominent without dominating. Re-fires on every `resize` event.
  */
 export function renderBigFrame(input: FrameInput): string {
   const { rows, cols, time } = input;

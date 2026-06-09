@@ -28,14 +28,16 @@ const GAP = " "; // one blank column between glyphs
 /**
  * Largest integer scale that fits `time` in the given terminal dimensions.
  * scale=1 is the original size; scale=2 doubles both width and height; etc.
- * Capped at 10× so absurdly large terminals still look sane.
+ * Targets ~75% of terminal width and ~50% of height so the clock stays
+ * prominent but never fills the screen — capped at 3 beyond which the `█`
+ * blocks lose their digital-clock shape and become solid rectangles.
  */
 export function computeScale(cols: number, rows: number, time: string): number {
   const baseW = bigWidth(time, 1);
   if (baseW === 0) return 1;
-  const ws = Math.floor(cols / baseW);
-  const hs = Math.floor(rows / BIG_ROWS);
-  return Math.max(1, Math.min(ws, hs, 10));
+  const ws = Math.floor((cols * 0.75) / baseW);
+  const hs = Math.floor((rows * 0.50) / BIG_ROWS);
+  return Math.max(1, Math.min(ws, hs, 3));
 }
 
 /**
