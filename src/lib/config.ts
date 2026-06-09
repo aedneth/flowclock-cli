@@ -82,6 +82,12 @@ export function setConfigValue(
     case "keybindings.quit":
       next.keybindings.quit = value;
       break;
+    case "keybindings.break":
+      next.keybindings.break = value;
+      break;
+    case "keybindings.category":
+      next.keybindings.category = value;
+      break;
     case "sessionsPath":
       next.sessionsPath = value === "" || value === "null" ? null : value;
       break;
@@ -90,6 +96,15 @@ export function setConfigValue(
       break;
     case "bigFont":
       next.bigFont = value === "true" || value === "1";
+      break;
+    case "displayStyle":
+      next.displayStyle = value as Config["displayStyle"];
+      break;
+    case "showControls":
+      next.showControls = value === "true" || value === "1";
+      break;
+    case "dailyFocusGoalS":
+      next.dailyFocusGoalS = Number(value);
       break;
   }
 

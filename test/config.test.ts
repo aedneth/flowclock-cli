@@ -55,6 +55,11 @@ describe("get/set values", () => {
     expect(getConfigValue(DEFAULT_CONFIG, "keybindings.pause")).toBe("p");
   });
 
+  it("reads new keybinding defaults", () => {
+    expect(getConfigValue(DEFAULT_CONFIG, "keybindings.break")).toBe("b");
+    expect(getConfigValue(DEFAULT_CONFIG, "keybindings.category")).toBe("c");
+  });
+
   it("rejects unsettable keys", () => {
     expect(() => setConfigValue(DEFAULT_CONFIG, "schemaVersion", "9")).toThrow(
       FlowclockError,
@@ -80,6 +85,67 @@ describe("get/set values", () => {
     expect(() => setConfigValue(DEFAULT_CONFIG, "theme", "purple")).toThrow(
       FlowclockError,
     );
+  });
+
+  it("sets and gets displayStyle", () => {
+    const cfg = setConfigValue(DEFAULT_CONFIG, "displayStyle", "block");
+    expect(cfg.displayStyle).toBe("block");
+    expect(getConfigValue(cfg, "displayStyle")).toBe("block");
+  });
+
+  it("rejects invalid displayStyle", () => {
+    expect(() =>
+      setConfigValue(DEFAULT_CONFIG, "displayStyle", "fancy"),
+    ).toThrow(FlowclockError);
+  });
+
+  it("sets and gets showControls", () => {
+    expect(
+      setConfigValue(DEFAULT_CONFIG, "showControls", "true").showControls,
+    ).toBe(true);
+    expect(
+      setConfigValue(DEFAULT_CONFIG, "showControls", "1").showControls,
+    ).toBe(true);
+    expect(
+      setConfigValue(DEFAULT_CONFIG, "showControls", "false").showControls,
+    ).toBe(false);
+    expect(getConfigValue(DEFAULT_CONFIG, "showControls")).toBe(true);
+  });
+
+  it("sets and gets dailyFocusGoalS", () => {
+    const cfg = setConfigValue(DEFAULT_CONFIG, "dailyFocusGoalS", "7200");
+    expect(cfg.dailyFocusGoalS).toBe(7200);
+    expect(getConfigValue(cfg, "dailyFocusGoalS")).toBe(7200);
+  });
+
+  it("rejects invalid dailyFocusGoalS (zero/negative)", () => {
+    expect(() =>
+      setConfigValue(DEFAULT_CONFIG, "dailyFocusGoalS", "0"),
+    ).toThrow(FlowclockError);
+    expect(() =>
+      setConfigValue(DEFAULT_CONFIG, "dailyFocusGoalS", "-100"),
+    ).toThrow(FlowclockError);
+  });
+
+  it("sets and gets keybindings.break", () => {
+    const cfg = setConfigValue(DEFAULT_CONFIG, "keybindings.break", "k");
+    expect(cfg.keybindings.break).toBe("k");
+    expect(getConfigValue(cfg, "keybindings.break")).toBe("k");
+  });
+
+  it("sets and gets keybindings.category", () => {
+    const cfg = setConfigValue(DEFAULT_CONFIG, "keybindings.category", "x");
+    expect(cfg.keybindings.category).toBe("x");
+    expect(getConfigValue(cfg, "keybindings.category")).toBe("x");
+  });
+
+  it("rejects multi-char keybinding values", () => {
+    expect(() =>
+      setConfigValue(DEFAULT_CONFIG, "keybindings.break", "bb"),
+    ).toThrow(FlowclockError);
+    expect(() =>
+      setConfigValue(DEFAULT_CONFIG, "keybindings.category", "cc"),
+    ).toThrow(FlowclockError);
   });
 });
 

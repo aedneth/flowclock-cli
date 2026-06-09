@@ -4,6 +4,35 @@ import { writeFileAtomic } from "./fsutil.js";
 import { SessionSchema, type Session } from "../schemas/session.js";
 import { ExitCode, fail } from "./exit.js";
 
+/**
+ * Normalize a parsed session for read-time back-compat.
+ *
+ * If the session has legacy `pauses` but no `breaks` (v1/v2 record), derive
+ * `breaks` from `pauses` with category "rest". Then if `breakS` is still 0,
+ * compute it as the sum of `breaks[].durationS`. Idempotent.
+ */
+export function normalizeSession(s: Session): Session {
+  let breaks = s.breaks;
+  let breakS = s.breakS;
+
+  if (breaks.length === 0 && s.pauses.length > 0) {
+    breaks = s.pauses.map((p) => ({
+      start: p.start,
+      end: p.end,
+      durationS: p.durationS,
+      category: "rest" as const,
+      label: null,
+      suggestedS: null,
+    }));
+  }
+
+  if (breakS === 0 && breaks.length > 0) {
+    breakS = breaks.reduce((sum, b) => sum + b.durationS, 0);
+  }
+
+  return { ...s, breaks, breakS };
+}
+
 export interface ReadResult {
   sessions: Session[];
   /** Path the corrupt file was backed up to, if recovery happened. */
@@ -37,7 +66,7 @@ export function readSessions(file: string): ReadResult {
   if (!result.success) {
     return { sessions: [], recoveredBackup: backupCorrupt(file) };
   }
-  return { sessions: result.data };
+  return { sessions: result.data.map(normalizeSession) };
 }
 
 /** Append one session and persist atomically. Returns the stored record. */
