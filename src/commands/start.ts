@@ -146,6 +146,7 @@ function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
       out.off("resize", render);
       stopKeys();
       process.off("SIGTERM", finish);
+      process.off("SIGINT", finish);
 
       // End any open break so toSession() gets the final totals.
       if (timer.isOnBreak) timer.endBreak();
@@ -191,6 +192,10 @@ function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
 
     out.on("resize", render);
     process.once("SIGTERM", finish);
+    // External SIGINT (`kill -INT`, process-group signal) — a normal Ctrl-C in
+    // raw mode is delivered as a byte to the key reader instead, but an external
+    // SIGINT must still restore the cursor and log the session.
+    process.once("SIGINT", finish);
 
     stopKeys = startKeyReader(process.stdin, ctx.config.keybindings, {
       onPause: () => {

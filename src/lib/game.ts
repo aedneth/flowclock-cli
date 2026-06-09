@@ -137,8 +137,6 @@ export function computeAchievements(
       }
     }
   }
-  // Use the earliest such day.
-  // (Already computed above — just need the earliest date.)
 
   // --- streak-7: longest streak of consecutive active days ≥ 7 ---
   const allKeys = [...new Set(sorted.map((s) => localDateKey(s.start)))].sort();
