@@ -46,8 +46,10 @@ describe("runCompletion", () => {
       const out = capture(() => runCompletion(ctx(), shell));
       expect(out.length).toBeGreaterThan(0);
       expect(out).toContain("flowclock");
-      // every script mentions a real subcommand
+      // every script mentions existing subcommands
       expect(out).toContain("stats");
+      // dashboard command must appear in every generated completion script
+      expect(out).toContain("dashboard");
     }
   });
 

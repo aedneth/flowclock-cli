@@ -2,13 +2,14 @@ import { describe, it, expect } from "vitest";
 import { computeStats, computeStreaks } from "../src/lib/stats.js";
 import { SessionSchema, type Session } from "../src/schemas/session.js";
 
-function s(durationS: number, start: string): Session {
+function s(durationS: number, start: string, breakS = 0): Session {
   return SessionSchema.parse({
     id: start,
     start,
     end: new Date(new Date(start).getTime() + durationS * 1000).toISOString(),
     durationS,
     source: "log",
+    breakS,
   });
 }
 
@@ -20,6 +21,9 @@ describe("computeStats", () => {
     expect(r.allTimeCount).toBe(0);
     expect(r.averageSessionS).toBe(0);
     expect(r.week).toHaveLength(7);
+    expect(r.todayBreakS).toBe(0);
+    expect(r.allTimeBreakS).toBe(0);
+    expect(r.focusRestRatioAllTime).toBe(0);
   });
 
   it("aggregates totals, best, and average", () => {
@@ -39,11 +43,28 @@ describe("computeStats", () => {
 
   it("counts today separately from all-time", () => {
     const r = computeStats(
-      [s(600, "2026-05-31T08:00:00.000Z"), s(900, "2026-05-30T08:00:00.000Z")],
+      [s(600, "2026-05-31T08:00:00.000Z", 120), s(900, "2026-05-30T08:00:00.000Z", 300)],
       now,
     );
     expect(r.todayCount).toBe(1);
     expect(r.todayTotalS).toBe(600);
+    expect(r.todayBreakS).toBe(120);
+    expect(r.allTimeBreakS).toBe(420);
+  });
+
+  it("computes focusRestRatioAllTime correctly", () => {
+    // 1800s focus total, 600s break total → ratio = 3
+    const r = computeStats(
+      [s(900, "2026-05-31T08:00:00.000Z", 300), s(900, "2026-05-30T08:00:00.000Z", 300)],
+      now,
+    );
+    expect(r.allTimeBreakS).toBe(600);
+    expect(r.focusRestRatioAllTime).toBeCloseTo(3, 5);
+  });
+
+  it("focusRestRatioAllTime is 0 when no breaks", () => {
+    const r = computeStats([s(600, "2026-05-31T08:00:00.000Z")], now);
+    expect(r.focusRestRatioAllTime).toBe(0);
   });
 
   it("produces a 7-day window ending today", () => {

@@ -18,6 +18,7 @@ import {
 } from "../lib/session.js";
 import { computeStats } from "../lib/stats.js";
 import { SessionSchema } from "../schemas/session.js";
+import { buildSnapshot } from "../lib/snapshot.js";
 
 /** JSON text content helper for tool results. */
 function jsonContent(value: unknown) {
@@ -74,16 +75,30 @@ export function createMcpServer(): McpServer {
   );
 
   server.tool(
+    "flowclock_dashboard",
+    "Return a full DashboardSnapshot (stats, gamification, goals, recent sessions) as JSON.",
+    {},
+    async () => {
+      const { file, config } = ctx();
+      const { sessions } = readSessions(file);
+      return jsonContent(buildSnapshot(sessions, config.dailyFocusGoalS));
+    },
+  );
+
+  server.tool(
     "flowclock_log",
-    "Record a completed session (duration in seconds; optional label/note/tags).",
+    "Record a completed session (duration in seconds; optional label/note/tags/goal/target/breakBudget).",
     {
       duration: z.number().int().nonnegative(),
       start: z.string().datetime().optional(),
       label: z.string().optional(),
       note: z.string().optional(),
       tags: z.array(z.string()).optional(),
+      goal: z.string().optional(),
+      target: z.number().int().nonnegative().optional(),
+      breakBudget: z.number().int().nonnegative().optional(),
     },
-    async ({ duration, start, label, note, tags }) => {
+    async ({ duration, start, label, note, tags, goal, target, breakBudget }) => {
       const { file } = ctx();
       const end = new Date();
       const startDate = start
@@ -99,6 +114,9 @@ export function createMcpServer(): McpServer {
         note: note ?? null,
         source: "log",
         tags: tags ?? [],
+        goal: goal ?? null,
+        focusTargetS: target ?? null,
+        breakBudgetS: breakBudget ?? null,
       });
       return jsonContent(appendSession(file, session));
     },

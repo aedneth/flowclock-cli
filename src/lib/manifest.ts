@@ -124,11 +124,28 @@ export function buildManifest(): Manifest {
             type: "boolean",
             description: "Force headless (requires --duration).",
           },
+          {
+            name: "--target",
+            type: "string",
+            description: "Focus target, e.g. 1h or 90m.",
+          },
+          {
+            name: "--break-budget",
+            type: "string",
+            description: "Break budget, e.g. 20m.",
+          },
+          {
+            name: "--zen",
+            type: "boolean",
+            description: "Minimal HUD: clock only, no controls footer.",
+          },
         ],
-        jsonData: "The logged Session record.",
+        jsonData:
+          "The logged Session record (v3 schema): includes breaks[], breakS, focusTargetS, breakBudgetS.",
         examples: [
           "flowclock start",
           "flowclock start --goal 'Deep work' --duration 1500 --json",
+          "flowclock start --target 1h --break-budget 20m",
         ],
       },
       {
@@ -160,12 +177,22 @@ export function buildManifest(): Manifest {
             description: "Goal/intention for this session.",
           },
           {
+            name: "--target",
+            type: "string",
+            description: "Focus target, e.g. 1h or 90m.",
+          },
+          {
+            name: "--break-budget",
+            type: "string",
+            description: "Break budget, e.g. 20m.",
+          },
+          {
             name: "--recmp3-session-id",
             type: "string",
             description: "Correlating recmp3-cli session id (naming convention).",
           },
         ],
-        jsonData: "The stored Session record.",
+        jsonData: "The stored Session record (v3 schema).",
         examples: ["flowclock log --duration 600 --label deep-work --json"],
       },
       {
@@ -180,7 +207,7 @@ export function buildManifest(): Manifest {
           },
         ],
         jsonData:
-          "StatsSummary { todayTotalS, todayCount, allTimeTotalS, allTimeCount, bestSessionS, averageSessionS, currentStreak, longestStreak, lastSessionDate, week[] }.",
+          "StatsSummary { todayTotalS, todayCount, allTimeTotalS, allTimeCount, bestSessionS, averageSessionS, currentStreak, longestStreak, lastSessionDate, week[], todayBreakS, allTimeBreakS } plus game { flowScore, dailyMaximizationPct, focusRestRatioToday, focusRestRatioAllTime, achievements }.",
         examples: ["flowclock stats --json"],
       },
       {
@@ -205,7 +232,7 @@ export function buildManifest(): Manifest {
       {
         name: "summary",
         summary:
-          "Markdown table of a week's sessions (Date|Sessions|Total|Best|Goal).",
+          "Markdown table of a week's sessions (Date|Sessions|Total|Best|Goal|Breaks|Focus:Rest).",
         flags: [
           {
             name: "--week",
@@ -213,7 +240,8 @@ export function buildManifest(): Manifest {
             description: "ISO week YYYY-WW to summarize (default: this week).",
           },
         ],
-        jsonData: "{ week, weekStart, days: [{ date, sessions, totalS, bestS, goal }] }.",
+        jsonData:
+          "{ week, weekStart, days: [{ date, sessions, totalS, bestS, goal, breakS, focusRestRatio }] }.",
         examples: ["flowclock summary --week 2026-23 --json"],
       },
       {
@@ -221,7 +249,7 @@ export function buildManifest(): Manifest {
         summary:
           "Your goals, learned from logged sessions, with hit/miss tallies.",
         jsonData:
-          "{ count, goals: [{ goal, count, totalS, met, missed, neutral, lastUsed }] }.",
+          "{ count, goals: [{ goal, count, totalS, met, missed, neutral, lastUsed, breakS, focusTargetS, breakBudgetS }] }.",
         examples: ["flowclock goals --json"],
       },
       {
@@ -252,6 +280,15 @@ export function buildManifest(): Manifest {
         args: ["<bash|zsh|fish>"],
         jsonData: "{ shell, script }.",
         examples: ["flowclock completion zsh"],
+      },
+      {
+        name: "dashboard",
+        summary:
+          "Interactive Flowtime dashboard TUI (aliases: dash, tui). Requires a TTY. Use --json to emit a DashboardSnapshot for agents without a TTY.",
+        flags: [],
+        jsonData:
+          "DashboardSnapshot { generatedAt, stats: StatsSummary, game: GameSummary, goals: GoalSummary[], recent: Session[] }.",
+        examples: ["flowclock dashboard", "flowclock dashboard --json"],
       },
       {
         name: "mcp",

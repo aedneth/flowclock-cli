@@ -6,6 +6,65 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-06-09
+
+flowclock grows from a count-up HUD into a **Flowtime control center**: it now
+times and categorizes your breaks, plays the "focus target / break budget" game,
+gamifies your day, and ships an interactive in-terminal dashboard — all still raw
+ANSI, zero new runtime dependencies, instant cold start.
+
+### Added
+
+- **Flowtime session model (schema → v3):** a session now tracks **categorized,
+  timed breaks** alongside focus time. Each break carries a `category`
+  (`rest · meal · exercise · walk · distraction · other`) plus an optional label.
+  New session fields: `breaks[]`, `breakS` (total break seconds), `focusTargetS`,
+  `breakBudgetS`. `durationS` keeps its meaning — **active focus seconds**.
+- **The game — targets & break budgets:** `start --target 1h --break-budget 20m`
+  sets a focus goal and a break allowance; the HUD shows live progress
+  (`goal · 42m/1h ███████░░░ 70%`), the remaining break budget, the live
+  focus:rest ratio, and a win marker (`✦`) when you hit the target within budget.
+  `log` accepts `--target` / `--break-budget` too.
+- **Proportional break suggestions:** a Flowtime engine (`flowtime.ts`) recommends
+  a break length from how long you focused (the 10–50%-of-work bands); the HUD
+  shows the suggestion when a break starts.
+- **In-session break flow:** `b` starts/ends a break; `1`–`6` pick its category;
+  `c` cycles category; `p` is still the quick rest toggle.
+- **Visible controls footer:** the HUD now shows an elegant, dim controls line
+  under the clock (like recmp3-cli) by default. **`start --zen`** (or
+  `showControls=false`) restores the clock-only purist HUD.
+- **Display styles:** `displayStyle` config (`simple` | `block`). The **simple**
+  centered clock is now the default; the block 7-segment font is opt-in via
+  `start --big` or `displayStyle=block`.
+- **Gamification:** `stats` now reports a **flow score** (0–100), **daily
+  maximization %** (focus vs. your `dailyFocusGoalS`), **focus:rest ratio**, and
+  **achievements** (First Hour, Deep Diver, Budget Master, Flow 4:1, Streak 7,
+  Century). Exposed under `stats --json` as a `game` object.
+- **Interactive dashboard:** **`flowclock dashboard`** (aliases `dash`, `tui`) — a
+  flicker-free, themed, navigable TUI built on a new in-house raw-ANSI toolkit
+  (alt-screen + double-buffer diff renderer). Views: Overview, Sessions (+ a
+  per-session focus/break timeline), Goals, and Breaks/analytics. Agent-native:
+  `--json` or non-TTY emits a `DashboardSnapshot` and never requires a terminal.
+- **End-of-session summary:** on stop (TTY), a short recap of focus total, break
+  total by category, focus:rest ratio, and target/budget outcome.
+- **MCP:** new `flowclock_dashboard` tool (returns the snapshot); `flowclock_log`
+  gains `goal` / `target` / `breakBudget` inputs.
+- New config keys: `displayStyle`, `showControls`, `dailyFocusGoalS` (default 4h),
+  and `keybindings.break` / `keybindings.category`.
+
+### Changed
+
+- **Default HUD is now the simple centered clock with a visible controls footer**
+  — a deliberate repositioning from "invisible HUD" to "Flowtime control center."
+  Use `--zen` to get the old minimalist, control-free clock.
+- **`sessions.json` schema → v3.** Migration is **non-destructive**: v1/v2 files
+  load unchanged, and legacy `pauses[]` are normalized into `breaks[]` (category
+  `rest`) on read so historical break analytics work immediately.
+- `stats`, `history`, `summary --week` (adds **Break** + **Ratio** columns), and
+  `goals` (adds break time + target/budget tallies) all reflect the new model.
+- The manifest (and therefore completion + MCP discovery) advertises `dashboard`
+  and the new `start`/`log` flags.
+
 ## [1.0.0] - 2026-06-03
 
 ### Added
@@ -62,6 +121,7 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/aedneth/flowclock-cli/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/aedneth/flowclock-cli/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/aedneth/flowclock-cli/releases/tag/v0.1.0

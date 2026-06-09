@@ -13,6 +13,7 @@ import {
   readSessions,
   querySessions,
   makeSessionId,
+  normalizeSession,
 } from "../src/lib/session.js";
 import { SessionSchema } from "../src/schemas/session.js";
 
@@ -90,7 +91,7 @@ describe("session store", () => {
     expect(sessions[0]!.recmp3SessionId).toBeNull();
   });
 
-  it("writes new sessions at schemaVersion 2 with goal fields", () => {
+  it("writes new sessions at schemaVersion 3 with goal fields", () => {
     const stored = appendSession(
       file,
       SessionSchema.parse({
@@ -102,10 +103,119 @@ describe("session store", () => {
         goal: "Deep work on StreamNet",
       }),
     );
-    expect(stored.schemaVersion).toBe(2);
+    expect(stored.schemaVersion).toBe(3);
     expect(stored.goal).toBe("Deep work on StreamNet");
     const { sessions } = readSessions(file);
     expect(sessions[0]!.goal).toBe("Deep work on StreamNet");
+  });
+});
+
+describe("normalizeSession", () => {
+  it("derives breaks from pauses on a v2-style record", () => {
+    const raw = SessionSchema.parse({
+      schemaVersion: 2,
+      id: "test-id",
+      start: "2026-05-01T10:00:00.000Z",
+      end: "2026-05-01T10:31:00.000Z",
+      durationS: 1500,
+      pauses: [
+        {
+          start: "2026-05-01T10:25:00.000Z",
+          end: "2026-05-01T10:31:00.000Z",
+          durationS: 360,
+        },
+      ],
+      source: "hud",
+    });
+    // Raw parse should have empty breaks (v3 default)
+    expect(raw.breaks).toHaveLength(0);
+    expect(raw.breakS).toBe(0);
+
+    const normalized = normalizeSession(raw);
+    expect(normalized.breaks).toHaveLength(1);
+    expect(normalized.breaks[0]!.category).toBe("rest");
+    expect(normalized.breaks[0]!.durationS).toBe(360);
+    expect(normalized.breaks[0]!.label).toBeNull();
+    expect(normalized.breaks[0]!.suggestedS).toBeNull();
+    expect(normalized.breakS).toBe(360);
+    // Original pauses preserved
+    expect(normalized.pauses).toHaveLength(1);
+  });
+
+  it("is idempotent — calling twice gives same result", () => {
+    const raw = SessionSchema.parse({
+      schemaVersion: 2,
+      id: "test-id",
+      start: "2026-05-01T10:00:00.000Z",
+      end: "2026-05-01T10:31:00.000Z",
+      durationS: 1500,
+      pauses: [
+        {
+          start: "2026-05-01T10:25:00.000Z",
+          end: "2026-05-01T10:31:00.000Z",
+          durationS: 360,
+        },
+      ],
+      source: "hud",
+    });
+    const once = normalizeSession(raw);
+    const twice = normalizeSession(once);
+    expect(twice.breaks).toHaveLength(1);
+    expect(twice.breakS).toBe(360);
+  });
+
+  it("does not overwrite existing breaks", () => {
+    const raw = SessionSchema.parse({
+      schemaVersion: 3,
+      id: "test-id",
+      start: "2026-05-01T10:00:00.000Z",
+      end: "2026-05-01T10:31:00.000Z",
+      durationS: 1500,
+      pauses: [],
+      breaks: [
+        {
+          start: "2026-05-01T10:25:00.000Z",
+          end: "2026-05-01T10:31:00.000Z",
+          durationS: 360,
+          category: "meal",
+          label: "lunch",
+          suggestedS: null,
+        },
+      ],
+      breakS: 360,
+      source: "hud",
+    });
+    const normalized = normalizeSession(raw);
+    expect(normalized.breaks).toHaveLength(1);
+    expect(normalized.breaks[0]!.category).toBe("meal");
+    expect(normalized.breakS).toBe(360);
+  });
+
+  it("readSessions applies normalizeSession to loaded records", () => {
+    const v2Record = {
+      schemaVersion: 2,
+      id: "2026-05-01T10-00-00-000-abcd",
+      start: "2026-05-01T10:00:00.000Z",
+      end: "2026-05-01T10:31:00.000Z",
+      durationS: 1500,
+      pauses: [
+        {
+          start: "2026-05-01T10:25:00.000Z",
+          end: "2026-05-01T10:31:00.000Z",
+          durationS: 360,
+        },
+      ],
+      label: null,
+      note: null,
+      source: "hud",
+      tags: [],
+    };
+    writeFileSync(file, JSON.stringify([v2Record]));
+    const { sessions } = readSessions(file);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]!.breaks).toHaveLength(1);
+    expect(sessions[0]!.breaks[0]!.category).toBe("rest");
+    expect(sessions[0]!.breakS).toBe(360);
   });
 });
 

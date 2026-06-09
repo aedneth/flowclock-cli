@@ -134,7 +134,7 @@ describe("flowclock CLI", () => {
   it("emits a markdown week summary and rejects a bad week", () => {
     const md = run(["summary", "--week", "2026-23"]);
     expect(md.status).toBe(0);
-    expect(md.stdout).toContain("| Date | Sessions | Total | Best | Goal |");
+    expect(md.stdout).toContain("| Date | Sessions | Total | Best | Break | Ratio | Goal |");
     expect(run(["summary", "--week", "garbage"]).status).toBe(2);
   });
 

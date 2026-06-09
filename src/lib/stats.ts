@@ -10,8 +10,14 @@ export interface DayBucket {
 export interface StatsSummary {
   todayTotalS: number;
   todayCount: number;
+  /** Break seconds on today's sessions. */
+  todayBreakS: number;
   allTimeTotalS: number;
   allTimeCount: number;
+  /** All-time break seconds across all sessions. */
+  allTimeBreakS: number;
+  /** All-time focus÷break ratio (focus/break); 0 when no breaks. */
+  focusRestRatioAllTime: number;
   bestSessionS: number;
   averageSessionS: number;
   /** Consecutive local days (ending today/yesterday) with ≥1 session. */
@@ -94,17 +100,21 @@ export function computeStats(
 
   let todayTotalS = 0;
   let todayCount = 0;
+  let todayBreakS = 0;
   let allTimeTotalS = 0;
+  let allTimeBreakS = 0;
   let bestSessionS = 0;
 
   const byDay = new Map<string, DayBucket>();
   for (const s of sessions) {
     const key = localDateKey(s.start);
     allTimeTotalS += s.durationS;
+    allTimeBreakS += s.breakS;
     if (s.durationS > bestSessionS) bestSessionS = s.durationS;
     if (key === todayKey) {
       todayTotalS += s.durationS;
       todayCount += 1;
+      todayBreakS += s.breakS;
     }
     const bucket = byDay.get(key) ?? { date: key, totalS: 0, count: 0 };
     bucket.totalS += s.durationS;
@@ -125,8 +135,11 @@ export function computeStats(
   return {
     todayTotalS,
     todayCount,
+    todayBreakS,
     allTimeTotalS,
     allTimeCount: sessions.length,
+    allTimeBreakS,
+    focusRestRatioAllTime: allTimeBreakS > 0 ? allTimeTotalS / allTimeBreakS : 0,
     bestSessionS,
     averageSessionS: sessions.length
       ? Math.round(allTimeTotalS / sessions.length)

@@ -10,6 +10,8 @@ export const KeybindingsSchema = z.object({
   pause: z.string().length(1).default("p"),
   reset: z.string().length(1).default("r"),
   quit: z.string().length(1).default("q"),
+  break: z.string().length(1).default("b"),
+  category: z.string().length(1).default("c"),
 });
 export type Keybindings = z.infer<typeof KeybindingsSchema>;
 
@@ -18,13 +20,25 @@ export const ConfigSchema = z.object({
     .literal(CONFIG_SCHEMA_VERSION)
     .default(CONFIG_SCHEMA_VERSION),
   theme: ThemeNameSchema.default("neon"),
-  keybindings: KeybindingsSchema.default({ pause: "p", reset: "r", quit: "q" }),
+  keybindings: KeybindingsSchema.default({
+    pause: "p",
+    reset: "r",
+    quit: "q",
+    break: "b",
+    category: "c",
+  }),
   /** Override path for sessions.json. `null` = default data dir. */
   sessionsPath: z.string().nullable().default(null),
   /** Optional JSON push endpoint (v0.3.0). */
   apiEndpoint: z.string().url().nullable().default(null),
   /** Optional big ASCII display (v0.3.0). */
   bigFont: z.boolean().default(false),
+  /** HUD display style: "simple" (default) or "block". */
+  displayStyle: z.enum(["simple", "block"]).default("simple"),
+  /** Whether to show the key-controls legend in the HUD. */
+  showControls: z.boolean().default(true),
+  /** Daily focus goal in seconds (default 4 h). */
+  dailyFocusGoalS: z.number().int().positive().default(14400),
 });
 export type Config = z.infer<typeof ConfigSchema>;
 
@@ -37,8 +51,13 @@ export const SETTABLE_KEYS = [
   "keybindings.pause",
   "keybindings.reset",
   "keybindings.quit",
+  "keybindings.break",
+  "keybindings.category",
   "sessionsPath",
   "apiEndpoint",
   "bigFont",
+  "displayStyle",
+  "showControls",
+  "dailyFocusGoalS",
 ] as const;
 export type SettableKey = (typeof SETTABLE_KEYS)[number];

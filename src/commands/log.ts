@@ -15,6 +15,10 @@ export interface LogOptions {
   tags?: string;
   goal?: string;
   recmp3SessionId?: string;
+  /** Pre-parsed focus target in seconds (from --target flag via cli.ts). */
+  focusTargetS?: number;
+  /** Pre-parsed break budget in seconds (from --break-budget flag via cli.ts). */
+  breakBudgetS?: number;
 }
 
 /** Read all of stdin synchronously, or null if stdin is an interactive TTY. */
@@ -80,6 +84,8 @@ export function runLog(ctx: CommandContext, opts: LogOptions): void {
       tags: opts.tags ? opts.tags.split(",").map((t) => t.trim()) : [],
       goal: opts.goal ?? null,
       recmp3SessionId: opts.recmp3SessionId ?? null,
+      focusTargetS: opts.focusTargetS ?? null,
+      breakBudgetS: opts.breakBudgetS ?? null,
     });
   }
 

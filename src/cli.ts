@@ -5,9 +5,10 @@ import {
   type CommandContext,
   type GlobalOptions,
 } from "./lib/context.js";
-import { ExitCode, FlowclockError } from "./lib/exit.js";
+import { ExitCode, FlowclockError, fail } from "./lib/exit.js";
 import { jsonError, printJson, jsonRequested } from "./lib/output.js";
 import { runStart } from "./commands/start.js";
+import { parseDurationToS } from "./lib/format.js";
 import { runLog } from "./commands/log.js";
 import { runStats } from "./commands/stats.js";
 import { runHistory } from "./commands/history.js";
@@ -18,6 +19,7 @@ import { runConfig, type ConfigAction } from "./commands/config.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runManifest } from "./commands/manifest.js";
 import { runMcp } from "./commands/mcp.js";
+import { runDashboard } from "./commands/dashboard.js";
 
 function toInt(value: string): number {
   const n = Number(value);
@@ -95,17 +97,42 @@ export function buildProgram(): Command {
       .option("--theme <name>", "theme override: neon|amber|blue|mono")
       .option("--big", "render the time in big ASCII (7-segment)")
       .option("--no-hud", "force headless (requires --duration)")
+      .option("--target <dur>", "focus target, e.g. 1h or 90m")
+      .option("--break-budget <dur>", "break budget, e.g. 20m")
+      .option("--zen", "minimal HUD: clock only, no controls footer")
       .action((opts, cmd: Command) =>
-        guard("start", cmd, (ctx) =>
-          runStart(ctx, {
+        guard("start", cmd, (ctx) => {
+          let target: number | undefined;
+          let breakBudget: number | undefined;
+
+          if (opts.target !== undefined) {
+            try {
+              target = parseDurationToS(opts.target as string);
+            } catch {
+              fail(ExitCode.USAGE, `invalid --target: ${opts.target as string} (use forms like 1h, 90m, 3600)`);
+            }
+          }
+
+          if (opts.breakBudget !== undefined) {
+            try {
+              breakBudget = parseDurationToS(opts.breakBudget as string);
+            } catch {
+              fail(ExitCode.USAGE, `invalid --break-budget: ${opts.breakBudget as string} (use forms like 20m, 1200)`);
+            }
+          }
+
+          return runStart(ctx, {
             duration: opts.duration,
             label: opts.label,
             goal: opts.goal,
             theme: opts.theme,
             big: opts.big,
             noHud: opts.hud === false,
-          }),
-        ),
+            target,
+            breakBudget,
+            zen: opts.zen as boolean | undefined,
+          });
+        }),
       ),
   );
 
@@ -124,8 +151,31 @@ export function buildProgram(): Command {
       .option("--tags <csv>", "comma-separated tags")
       .option("--goal <text>", "goal/intention for this session")
       .option("--recmp3-session-id <id>", "correlating recmp3-cli session id")
+      .option("--target <dur>", "focus target, e.g. 1h or 90m")
+      .option("--break-budget <dur>", "break budget, e.g. 20m")
       .action((opts, cmd: Command) =>
-        guard("log", cmd, (ctx) => runLog(ctx, opts)),
+        guard("log", cmd, (ctx) => {
+          let focusTargetS: number | undefined;
+          let breakBudgetS: number | undefined;
+
+          if (opts.target !== undefined) {
+            try {
+              focusTargetS = parseDurationToS(opts.target as string);
+            } catch {
+              fail(ExitCode.USAGE, `invalid --target: ${opts.target as string} (use forms like 1h, 90m, 3600)`);
+            }
+          }
+
+          if (opts.breakBudget !== undefined) {
+            try {
+              breakBudgetS = parseDurationToS(opts.breakBudget as string);
+            } catch {
+              fail(ExitCode.USAGE, `invalid --break-budget: ${opts.breakBudget as string} (use forms like 20m, 1200)`);
+            }
+          }
+
+          return runLog(ctx, { ...opts, focusTargetS, breakBudgetS });
+        }),
       ),
   );
 
@@ -237,6 +287,19 @@ export function buildProgram(): Command {
       .command("mcp")
       .description("start an MCP stdio server exposing flowclock tools")
       .action((_opts, cmd: Command) => guard("mcp", cmd, () => runMcp())),
+  );
+
+  // dashboard
+  addGlobalFlags(
+    program
+      .command("dashboard")
+      .aliases(["dash", "tui"])
+      .description(
+        "open the interactive Flowtime dashboard (TUI; --json for a snapshot)",
+      )
+      .action((_opts, cmd: Command) =>
+        guard("dashboard", cmd, (ctx) => runDashboard(ctx, {})),
+      ),
   );
 
   return program;

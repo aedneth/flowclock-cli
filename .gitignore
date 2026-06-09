@@ -10,3 +10,6 @@ docs/planning/
 # .brain/ — local second-brain tooling, never committed to public repos
 .brain/
 graphify-out
+
+# .claude/ — local Claude Code project settings, hooks, worktrees, plans
+.claude/

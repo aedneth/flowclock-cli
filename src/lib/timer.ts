@@ -1,6 +1,7 @@
 import {
   SESSION_SCHEMA_VERSION,
-  type Pause,
+  type Break,
+  type BreakCategory,
   type Session,
   type SessionSource,
 } from "../schemas/session.js";
@@ -20,17 +21,21 @@ export function formatHMS(totalSeconds: number): string {
 }
 
 /**
- * Pure count-up timer. All time arithmetic mirrors flowtime.sh:
- *   elapsed = now - start - totalPause
- * Paused time is excluded from the active duration.
+ * Pure count-up timer with categorized break support. All time arithmetic
+ * mirrors flowtime.sh:
+ *   elapsed = now - start - totalBreak
+ * Break time is excluded from the active (focus) duration.
  */
 export class Timer {
   private readonly clock: Clock;
   private startMs: number;
-  private paused = false;
-  private pauseStartMs = 0;
-  private totalPauseMs = 0;
-  private readonly pauses: Pause[] = [];
+  private onBreak = false;
+  private breakStartMs = 0;
+  private breakCategory: BreakCategory = "rest";
+  private breakLabel: string | null = null;
+  private breakSuggestedS: number | null = null;
+  private totalBreakMs = 0;
+  private readonly breaks: Break[] = [];
 
   constructor(clock: Clock = Date.now, startMs?: number) {
     this.clock = clock;
@@ -38,40 +43,96 @@ export class Timer {
   }
 
   get isPaused(): boolean {
-    return this.paused;
+    return this.onBreak;
   }
 
-  /** Toggle pause/resume — the `p` control. */
-  togglePause(): void {
+  get isOnBreak(): boolean {
+    return this.onBreak;
+  }
+
+  /** Start a break. No-op if already on break. */
+  startBreak(
+    category: BreakCategory = "rest",
+    label: string | null = null,
+    suggestedS: number | null = null,
+  ): void {
+    if (this.onBreak) return;
+    this.onBreak = true;
+    this.breakStartMs = this.clock();
+    this.breakCategory = category;
+    this.breakLabel = label;
+    this.breakSuggestedS = suggestedS;
+  }
+
+  /** End the current break. No-op if not on break. */
+  endBreak(): void {
+    if (!this.onBreak) return;
     const now = this.clock();
-    if (!this.paused) {
-      this.paused = true;
-      this.pauseStartMs = now;
+    const breakForMs = now - this.breakStartMs;
+    this.totalBreakMs += breakForMs;
+    this.breaks.push({
+      start: new Date(this.breakStartMs).toISOString(),
+      end: new Date(now).toISOString(),
+      durationS: Math.round(breakForMs / 1000),
+      category: this.breakCategory,
+      label: this.breakLabel,
+      suggestedS: this.breakSuggestedS,
+    });
+    this.onBreak = false;
+    this.breakStartMs = 0;
+    this.breakLabel = null;
+    this.breakSuggestedS = null;
+  }
+
+  /** Toggle break/resume — back-compat alias for the `p` key. */
+  togglePause(): void {
+    if (this.onBreak) {
+      this.endBreak();
     } else {
-      this.paused = false;
-      const pausedFor = now - this.pauseStartMs;
-      this.totalPauseMs += pausedFor;
-      this.pauses.push({
-        start: new Date(this.pauseStartMs).toISOString(),
-        end: new Date(now).toISOString(),
-        durationS: Math.round(pausedFor / 1000),
-      });
+      this.startBreak("rest");
     }
   }
 
-  /** Reset to zero and clear pause state — the `r` control. */
-  reset(): void {
-    this.startMs = this.clock();
-    this.totalPauseMs = 0;
-    this.paused = false;
-    this.pauseStartMs = 0;
-    this.pauses.length = 0;
+  /** Seconds elapsed in the current in-progress break (0 if not on break). */
+  currentBreakS(): number {
+    if (!this.onBreak) return 0;
+    return Math.floor((this.clock() - this.breakStartMs) / 1000);
   }
 
-  /** Active elapsed milliseconds (frozen while paused). */
+  get currentBreakCategory(): BreakCategory {
+    return this.breakCategory;
+  }
+
+  /**
+   * Change the category of the current in-progress break.
+   * No-op if not currently on break.
+   */
+  setBreakCategory(category: BreakCategory): void {
+    if (!this.onBreak) return;
+    this.breakCategory = category;
+  }
+
+  /**
+   * Total break seconds accumulated so far (closed breaks + current open break).
+   * Mirrors the elapsedS() pattern: always reflects the live total.
+   */
+  totalBreakS(): number {
+    return Math.floor(this.totalBreakMs / 1000) + this.currentBreakS();
+  }
+
+  /** Reset to zero and clear break state — the `r` control. */
+  reset(): void {
+    this.startMs = this.clock();
+    this.totalBreakMs = 0;
+    this.onBreak = false;
+    this.breakStartMs = 0;
+    this.breaks.length = 0;
+  }
+
+  /** Active elapsed milliseconds (frozen while on break). */
   elapsedMs(): number {
-    const ref = this.paused ? this.pauseStartMs : this.clock();
-    return Math.max(0, ref - this.startMs - this.totalPauseMs);
+    const ref = this.onBreak ? this.breakStartMs : this.clock();
+    return Math.max(0, ref - this.startMs - this.totalBreakMs);
   }
 
   /** Active elapsed whole seconds. */
@@ -85,8 +146,8 @@ export class Timer {
   }
 
   /**
-   * Build the loggable session record at stop time. If currently paused, the
-   * open pause is closed at `now` so durationS stays consistent.
+   * Build the loggable session record at stop time. If currently on a break,
+   * the open break is closed at `now` so durationS stays consistent.
    */
   toSession(opts: {
     source: SessionSource;
@@ -96,22 +157,30 @@ export class Timer {
     goal?: string | null;
     goalMet?: boolean | null;
     recmp3SessionId?: string | null;
+    focusTargetS?: number | null;
+    breakBudgetS?: number | null;
   }): Session {
     const now = this.clock();
-    const pauses = [...this.pauses];
-    let totalPauseMs = this.totalPauseMs;
-    if (this.paused) {
-      const pausedFor = now - this.pauseStartMs;
-      totalPauseMs += pausedFor;
-      pauses.push({
-        start: new Date(this.pauseStartMs).toISOString(),
+    const breaks = [...this.breaks];
+    let totalBreakMs = this.totalBreakMs;
+
+    if (this.onBreak) {
+      const breakForMs = now - this.breakStartMs;
+      totalBreakMs += breakForMs;
+      breaks.push({
+        start: new Date(this.breakStartMs).toISOString(),
         end: new Date(now).toISOString(),
-        durationS: Math.round(pausedFor / 1000),
+        durationS: Math.round(breakForMs / 1000),
+        category: this.breakCategory,
+        label: this.breakLabel,
+        suggestedS: this.breakSuggestedS,
       });
     }
+
+    const breakS = breaks.reduce((sum, b) => sum + b.durationS, 0);
     const durationS = Math.max(
       0,
-      Math.floor((now - this.startMs - totalPauseMs) / 1000),
+      Math.floor((now - this.startMs - totalBreakMs) / 1000),
     );
     const startDate = new Date(this.startMs);
     return {
@@ -120,7 +189,9 @@ export class Timer {
       start: startDate.toISOString(),
       end: new Date(now).toISOString(),
       durationS,
-      pauses,
+      pauses: [],
+      breaks,
+      breakS,
       label: opts.label ?? null,
       note: opts.note ?? null,
       source: opts.source,
@@ -128,6 +199,8 @@ export class Timer {
       goal: opts.goal ?? null,
       goalMet: opts.goalMet ?? null,
       recmp3SessionId: opts.recmp3SessionId ?? null,
+      focusTargetS: opts.focusTargetS ?? null,
+      breakBudgetS: opts.breakBudgetS ?? null,
     };
   }
 }

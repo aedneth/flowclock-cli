@@ -14,6 +14,12 @@ export interface GoalSummary {
   missed: number;
   neutral: number;
   lastUsed: string; // ISO start of the most recent session with this goal
+  /** Total break seconds across sessions for this goal. */
+  totalBreakS: number;
+  /** Sessions where breakBudgetS was set and breakS <= breakBudgetS. */
+  budgetMet: number;
+  /** Sessions where focusTargetS was set and durationS >= focusTargetS. */
+  targetMet: number;
 }
 
 /** Aggregate sessions into per-goal summaries, most recently used first. */
@@ -29,12 +35,22 @@ export function summarizeGoals(sessions: Session[]): GoalSummary[] {
       missed: 0,
       neutral: 0,
       lastUsed: s.start,
+      totalBreakS: 0,
+      budgetMet: 0,
+      targetMet: 0,
     };
     g.count += 1;
     g.totalS += s.durationS;
+    g.totalBreakS += s.breakS;
     if (s.goalMet === true) g.met += 1;
     else if (s.goalMet === false) g.missed += 1;
     else g.neutral += 1;
+    if (s.breakBudgetS !== null && s.breakBudgetS !== undefined && s.breakS <= s.breakBudgetS) {
+      g.budgetMet += 1;
+    }
+    if (s.focusTargetS !== null && s.focusTargetS !== undefined && s.durationS >= s.focusTargetS) {
+      g.targetMet += 1;
+    }
     if (new Date(s.start).getTime() > new Date(g.lastUsed).getTime()) {
       g.lastUsed = s.start;
     }
@@ -66,7 +82,8 @@ export function runGoals(ctx: CommandContext): void {
   const lines = goals.map((g) => {
     const total = humanDuration(g.totalS).padStart(12);
     const tally = `${g.met}✓ ${g.missed}✗ ${g.neutral}·`;
-    return `${total}  ${String(g.count).padStart(3)}×  ${tally.padEnd(12)}  ${g.goal}`;
+    const breakPart = g.totalBreakS > 0 ? `  break ${humanDuration(g.totalBreakS)}` : "";
+    return `${total}  ${String(g.count).padStart(3)}×  ${tally.padEnd(12)}${breakPart}  ${g.goal}`;
   });
   process.stdout.write(lines.join("\n") + "\n");
 }
