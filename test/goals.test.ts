@@ -7,6 +7,9 @@ function s(opts: {
   durationS: number;
   goal?: string | null;
   goalMet?: boolean | null;
+  breakS?: number;
+  breakBudgetS?: number | null;
+  focusTargetS?: number | null;
 }): Session {
   return SessionSchema.parse({
     id: `id-${opts.start}`,
@@ -18,6 +21,9 @@ function s(opts: {
     source: "log",
     goal: opts.goal ?? null,
     goalMet: opts.goalMet ?? null,
+    breakS: opts.breakS ?? 0,
+    breakBudgetS: opts.breakBudgetS ?? null,
+    focusTargetS: opts.focusTargetS ?? null,
   });
 }
 
@@ -44,7 +50,36 @@ describe("summarizeGoals", () => {
       missed: 1,
       neutral: 1,
       lastUsed: "2026-06-03T10:00:00.000Z",
+      totalBreakS: 0,
+      budgetMet: 0,
+      targetMet: 0,
     });
+  });
+
+  it("sums totalBreakS across sessions for a goal", () => {
+    const out = summarizeGoals([
+      s({ start: "2026-06-01T10:00:00.000Z", durationS: 60, goal: "A", breakS: 120 }),
+      s({ start: "2026-06-02T10:00:00.000Z", durationS: 60, goal: "A", breakS: 180 }),
+    ]);
+    expect(out[0]!.totalBreakS).toBe(300);
+  });
+
+  it("tallies budgetMet when breakS <= breakBudgetS", () => {
+    const out = summarizeGoals([
+      s({ start: "2026-06-01T10:00:00.000Z", durationS: 3600, goal: "A", breakS: 300, breakBudgetS: 600 }),
+      s({ start: "2026-06-02T10:00:00.000Z", durationS: 3600, goal: "A", breakS: 700, breakBudgetS: 600 }),
+      s({ start: "2026-06-03T10:00:00.000Z", durationS: 3600, goal: "A" }), // no budget set
+    ]);
+    expect(out[0]!.budgetMet).toBe(1);
+  });
+
+  it("tallies targetMet when durationS >= focusTargetS", () => {
+    const out = summarizeGoals([
+      s({ start: "2026-06-01T10:00:00.000Z", durationS: 3600, goal: "A", focusTargetS: 3600 }),
+      s({ start: "2026-06-02T10:00:00.000Z", durationS: 3000, goal: "A", focusTargetS: 3600 }),
+      s({ start: "2026-06-03T10:00:00.000Z", durationS: 3600, goal: "A" }), // no target
+    ]);
+    expect(out[0]!.targetMet).toBe(1);
   });
 
   it("orders goals by most recently used", () => {

@@ -10,7 +10,7 @@ import {
 import { summarizeWeek } from "../src/commands/summary.js";
 import { SessionSchema, type Session } from "../src/schemas/session.js";
 
-function s(start: string, durationS: number, goal?: string): Session {
+function s(start: string, durationS: number, goal?: string, breakS = 0): Session {
   return SessionSchema.parse({
     id: start,
     start,
@@ -18,6 +18,7 @@ function s(start: string, durationS: number, goal?: string): Session {
     durationS,
     source: "log",
     goal: goal ?? null,
+    breakS,
   });
 }
 
@@ -87,5 +88,16 @@ describe("summarizeWeek", () => {
     const monday = isoWeekToMonday(2026, 23);
     const rows = summarizeWeek([s(day0Iso(monday), 300)], monday);
     expect(rows[0]!.goal).toBe("");
+  });
+
+  it("sums breakS per day", () => {
+    const monday = isoWeekToMonday(2026, 23);
+    const day0 = day0Iso(monday);
+    const rows = summarizeWeek(
+      [s(day0, 3600, undefined, 300), s(day0, 1800, undefined, 120)],
+      monday,
+    );
+    expect(rows[0]!.breakS).toBe(420);
+    expect(rows[1]!.breakS).toBe(0);
   });
 });

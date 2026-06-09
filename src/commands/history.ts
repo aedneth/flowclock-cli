@@ -3,11 +3,19 @@ import { readSessions, querySessions } from "../lib/session.js";
 import { sessionsPathFor } from "../lib/config.js";
 import { humanDuration } from "../lib/format.js";
 import { jsonSuccess, printJson } from "../lib/output.js";
+import type { Break } from "../schemas/session.js";
 
 export interface HistoryOptions {
   limit?: number;
   since?: string;
   until?: string;
+}
+
+/** Summarise break categories for inline display, e.g. "rest/meal". */
+function breakCategorySummary(breaks: Break[]): string {
+  if (breaks.length === 0) return "";
+  const cats = [...new Set(breaks.map((b) => b.category))];
+  return cats.join("/");
 }
 
 export function runHistory(ctx: CommandContext, opts: HistoryOptions): void {
@@ -36,7 +44,14 @@ export function runHistory(ctx: CommandContext, opts: HistoryOptions): void {
     const goal = s.goal
       ? `  🎯 ${s.goal}${s.goalMet === true ? " ✓" : s.goalMet === false ? " ✗" : ""}`
       : "";
-    return `${when}  ${dur}  [${s.source}]${label}${goal}`;
+    // Break info: show total break time + categories when present.
+    let breakInfo = "";
+    if (s.breakS > 0) {
+      const cats = breakCategorySummary(s.breaks);
+      const catPart = cats ? `/${cats}` : "";
+      breakInfo = `  · +${humanDuration(s.breakS)} rest${catPart}`;
+    }
+    return `${when}  ${dur}  [${s.source}]${label}${goal}${breakInfo}`;
   });
   process.stdout.write(lines.join("\n") + "\n");
 }

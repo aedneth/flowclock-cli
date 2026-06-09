@@ -25,6 +25,8 @@ export interface WeekDayRow {
   totalS: number;
   bestS: number;
   goal: string;
+  /** Total break seconds for this day. */
+  breakS: number;
 }
 
 /** Aggregate one Mon→Sun window into per-day rows (empty days included). */
@@ -44,6 +46,7 @@ export function summarizeWeek(
     const day = byDay.get(date)!;
     const totalS = day.reduce((sum, s) => sum + s.durationS, 0);
     const bestS = day.reduce((mx, s) => Math.max(mx, s.durationS), 0);
+    const breakS = day.reduce((sum, s) => sum + s.breakS, 0);
     // The day's headline goal: the one with the most active time.
     const goalTime = new Map<string, number>();
     for (const s of day) {
@@ -51,19 +54,28 @@ export function summarizeWeek(
     }
     const goal =
       [...goalTime.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? "";
-    return { date, sessions: day.length, totalS, bestS, goal };
+    return { date, sessions: day.length, totalS, bestS, goal, breakS };
   });
 }
 
 function toMarkdown(label: string, rows: WeekDayRow[]): string {
-  const head = `### Week ${label}\n\n| Date | Sessions | Total | Best | Goal |\n| ---- | -------- | ----- | ---- | ---- |`;
-  const body = rows.map(
-    (r) =>
-      `| ${r.date} | ${r.sessions} | ${r.sessions ? humanDuration(r.totalS) : "—"} | ${r.sessions ? humanDuration(r.bestS) : "—"} | ${r.goal || ""} |`,
-  );
+  const head = `### Week ${label}\n\n| Date | Sessions | Total | Best | Break | Ratio | Goal |\n| ---- | -------- | ----- | ---- | ----- | ----- | ---- |`;
+  const body = rows.map((r) => {
+    const totalStr = r.sessions ? humanDuration(r.totalS) : "—";
+    const bestStr = r.sessions ? humanDuration(r.bestS) : "—";
+    const breakStr = r.breakS > 0 ? humanDuration(r.breakS) : "—";
+    const ratioStr =
+      r.sessions && r.breakS > 0
+        ? `${(r.totalS / r.breakS).toFixed(1)}:1`
+        : "—";
+    return `| ${r.date} | ${r.sessions} | ${totalStr} | ${bestStr} | ${breakStr} | ${ratioStr} | ${r.goal} |`;
+  });
   const weekTotal = rows.reduce((s, r) => s + r.totalS, 0);
+  const weekBreak = rows.reduce((s, r) => s + r.breakS, 0);
   const weekCount = rows.reduce((s, r) => s + r.sessions, 0);
-  const total = `| **Total** | **${weekCount}** | **${humanDuration(weekTotal)}** | | |`;
+  const weekRatioStr =
+    weekBreak > 0 ? `${(weekTotal / weekBreak).toFixed(1)}:1` : "—";
+  const total = `| **Total** | **${weekCount}** | **${humanDuration(weekTotal)}** | | **${weekBreak > 0 ? humanDuration(weekBreak) : "—"}** | **${weekRatioStr}** | |`;
   return [head, ...body, total].join("\n") + "\n";
 }
 

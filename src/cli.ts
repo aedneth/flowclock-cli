@@ -150,8 +150,31 @@ export function buildProgram(): Command {
       .option("--tags <csv>", "comma-separated tags")
       .option("--goal <text>", "goal/intention for this session")
       .option("--recmp3-session-id <id>", "correlating recmp3-cli session id")
+      .option("--target <dur>", "focus target, e.g. 1h or 90m")
+      .option("--break-budget <dur>", "break budget, e.g. 20m")
       .action((opts, cmd: Command) =>
-        guard("log", cmd, (ctx) => runLog(ctx, opts)),
+        guard("log", cmd, (ctx) => {
+          let focusTargetS: number | undefined;
+          let breakBudgetS: number | undefined;
+
+          if (opts.target !== undefined) {
+            try {
+              focusTargetS = parseDurationToS(opts.target as string);
+            } catch {
+              fail(ExitCode.USAGE, `invalid --target: ${opts.target as string} (use forms like 1h, 90m, 3600)`);
+            }
+          }
+
+          if (opts.breakBudget !== undefined) {
+            try {
+              breakBudgetS = parseDurationToS(opts.breakBudget as string);
+            } catch {
+              fail(ExitCode.USAGE, `invalid --break-budget: ${opts.breakBudget as string} (use forms like 20m, 1200)`);
+            }
+          }
+
+          return runLog(ctx, { ...opts, focusTargetS, breakBudgetS });
+        }),
       ),
   );
 
