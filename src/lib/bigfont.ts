@@ -1,13 +1,13 @@
 /**
  * Minimal 5-row block font for the `--big` HUD. Covers the only glyphs a clock
  * ever needs: digits 0-9 and the colon. Each glyph is 5 rows tall; digits are 4
- * columns wide and the colon is 1, so a full "HH:MM:SS" is 43 columns — the
- * caller falls back to the compact HUD below `BIG_MIN_COLS`.
+ * columns wide and the colon is 1, so a full "HH:MM:SS" is 33 columns at scale 1.
+ * The font scales up to fill the available terminal space via `computeScale`.
  */
 
 export const BIG_ROWS = 5;
-/** Terminal must be at least this wide or we fall back to the compact HUD. */
-export const BIG_MIN_COLS = 60;
+/** Minimum cols to render HH:MM:SS at scale 1 (exact base width). */
+export const BIG_MIN_COLS = 33;
 
 const GLYPHS: Record<string, string[]> = {
   "0": ["████", "█  █", "█  █", "█  █", "████"],
@@ -26,24 +26,41 @@ const GLYPHS: Record<string, string[]> = {
 const GAP = " "; // one blank column between glyphs
 
 /**
- * Render a clock string (e.g. "01:23:45") as an array of `BIG_ROWS` text rows.
- * Unknown characters render as a blank 1-column cell, so the function never
- * throws on unexpected input.
+ * Largest integer scale that fits `time` in the given terminal dimensions.
+ * scale=1 is the original size; scale=2 doubles both width and height; etc.
+ * Capped at 10× so absurdly large terminals still look sane.
  */
-export function renderBigLines(time: string): string[] {
-  const rows = Array.from({ length: BIG_ROWS }, () => "");
+export function computeScale(cols: number, rows: number, time: string): number {
+  const baseW = bigWidth(time, 1);
+  if (baseW === 0) return 1;
+  const ws = Math.floor(cols / baseW);
+  const hs = Math.floor(rows / BIG_ROWS);
+  return Math.max(1, Math.min(ws, hs, 10));
+}
+
+/**
+ * Render a clock string (e.g. "01:23:45") as an array of `BIG_ROWS * scale`
+ * text rows. scale=1 (default) reproduces the original output exactly.
+ * Unknown characters render as a blank cell so the function never throws.
+ */
+export function renderBigLines(time: string, scale = 1): string[] {
+  const totalRows = BIG_ROWS * scale;
+  const rows = Array.from({ length: totalRows }, () => "");
   const chars = [...time];
   chars.forEach((ch, idx) => {
     const glyph = GLYPHS[ch] ?? [" ", " ", " ", " ", " "];
-    const sep = idx < chars.length - 1 ? GAP : "";
+    const sep = idx < chars.length - 1 ? GAP.repeat(scale) : "";
     for (let r = 0; r < BIG_ROWS; r++) {
-      rows[r] = (rows[r] ?? "") + (glyph[r] ?? "") + sep;
+      const scaledRow = [...(glyph[r] ?? "")].map((c) => c.repeat(scale)).join("");
+      for (let s = 0; s < scale; s++) {
+        rows[r * scale + s] = (rows[r * scale + s] ?? "") + scaledRow + sep;
+      }
     }
   });
   return rows;
 }
 
-/** Width in columns of the rendered block for `time` (rows are equal width). */
-export function bigWidth(time: string): number {
-  return renderBigLines(time)[0]?.length ?? 0;
+/** Width in columns of the rendered block at the given scale (default 1). */
+export function bigWidth(time: string, scale = 1): number {
+  return renderBigLines(time, scale)[0]?.length ?? 0;
 }

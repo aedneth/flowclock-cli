@@ -13,7 +13,7 @@ export const ANSI = {
   cursorTo: (row: number, col: number) => `\x1b[${row};${col}H`,
 };
 
-import { renderBigLines, bigWidth, BIG_ROWS, BIG_MIN_COLS } from "./bigfont.js";
+import { renderBigLines, bigWidth, computeScale, BIG_ROWS } from "./bigfont.js";
 
 export interface FrameInput {
   rows: number;
@@ -50,18 +50,21 @@ export function renderFrame(input: FrameInput): string {
  * Render one frame of the big 7-segment HUD. Returns "" when the window is too
  * short or too narrow for the block font — the caller then falls back to
  * `renderFrame` (compact), so `--big` degrades gracefully and never crashes.
+ * The font scales up to fill the terminal: a 200-col terminal gets 6× digits,
+ * an 80-col terminal gets 2×, etc. Re-fires on every `resize` event in start.ts.
  */
 export function renderBigFrame(input: FrameInput): string {
   const { rows, cols, time } = input;
   if (!Number.isFinite(rows) || !Number.isFinite(cols)) return "";
+  if (cols < bigWidth(time, 1) || rows < BIG_ROWS) return "";
 
-  const width = bigWidth(time);
-  // Fall back on narrow terminals (per spec) or when the block can't fit.
-  if (cols < BIG_MIN_COLS || cols < width || rows < BIG_ROWS) return "";
+  const scale = computeScale(cols, rows, time);
+  const lines = renderBigLines(time, scale);
+  const scaledHeight = BIG_ROWS * scale;
+  const scaledWidth = lines[0]?.length ?? 0;
 
-  const lines = renderBigLines(time);
-  const topRow = Math.max(1, Math.floor((rows - BIG_ROWS) / 2) + 1);
-  const col = Math.max(1, Math.floor((cols - width) / 2) + 1);
+  const topRow = Math.max(1, Math.floor((rows - scaledHeight) / 2) + 1);
+  const col = Math.max(1, Math.floor((cols - scaledWidth) / 2) + 1);
   const colorOn = input.colorOn ?? "";
   const colorOff = input.colorOn ? (input.colorOff ?? ANSI.reset) : "";
 
