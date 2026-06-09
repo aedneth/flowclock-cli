@@ -19,6 +19,7 @@ import { runConfig, type ConfigAction } from "./commands/config.js";
 import { runDoctor } from "./commands/doctor.js";
 import { runManifest } from "./commands/manifest.js";
 import { runMcp } from "./commands/mcp.js";
+import { runDashboard } from "./commands/dashboard.js";
 
 function toInt(value: string): number {
   const n = Number(value);
@@ -286,6 +287,19 @@ export function buildProgram(): Command {
       .command("mcp")
       .description("start an MCP stdio server exposing flowclock tools")
       .action((_opts, cmd: Command) => guard("mcp", cmd, () => runMcp())),
+  );
+
+  // dashboard
+  addGlobalFlags(
+    program
+      .command("dashboard")
+      .aliases(["dash", "tui"])
+      .description(
+        "open the interactive Flowtime dashboard (TUI; --json for a snapshot)",
+      )
+      .action((_opts, cmd: Command) =>
+        guard("dashboard", cmd, (ctx) => runDashboard(ctx, {})),
+      ),
   );
 
   return program;
