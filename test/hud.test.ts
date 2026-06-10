@@ -221,6 +221,30 @@ describe("renderHud", () => {
     expect(frame).toContain("break");
     expect(frame).toContain("10m"); // 600s = 10m
   });
+
+  it("block style with extras on modest terminal keeps footer and progress visible", () => {
+    // 70×18: wide enough for the block clock at scale 1 (33 cols), tall enough
+    // for BIG_ROWS (5) but modest enough that a greedy scale would crowd extras.
+    // The reserve-first logic must leave room for the progress and footer.
+    const frame = renderHud(
+      baseState({
+        style: "block",
+        rows: 18,
+        cols: 70,
+        zen: false,
+        showControls: true,
+        focusTargetS: 3600,
+        breakBudgetS: 600,
+        totalBreakS: 120,
+        focusS: 1800,
+        keybindings: { pause: "p", reset: "r", quit: "q", break: "b", category: "c" },
+      }),
+    );
+    // Footer must be present (counter did not crowd it off-screen)
+    expect(frame).toContain("pause");
+    // Progress block must be present
+    expect(frame).toContain("break");
+  });
 });
 
 // ---------------------------------------------------------------------------

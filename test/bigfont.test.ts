@@ -3,6 +3,7 @@ import {
   renderBigLines,
   bigWidth,
   computeScale,
+  computeSessionScale,
   BIG_ROWS,
   BIG_MIN_COLS,
 } from "../src/lib/bigfont.js";
@@ -56,6 +57,41 @@ describe("computeScale", () => {
   it("is height-limited when rows is the binding constraint", () => {
     // (200*0.75)/33=4 (width allows 4), but (6*0.50)/5=0 → clamped to 1 (height-bound)
     expect(computeScale(200, 6, "00:00:00")).toBe(1);
+  });
+});
+
+describe("computeSessionScale", () => {
+  it("returns >= 1 for any input (large area)", () => {
+    expect(computeSessionScale(200, 40, "00:00:00")).toBeGreaterThanOrEqual(1);
+  });
+
+  it("returns >= 1 for any input (tiny area)", () => {
+    expect(computeSessionScale(10, 4, "00:00:00")).toBeGreaterThanOrEqual(1);
+  });
+
+  it("returns >= 1 when areaCols is smaller than one glyph width", () => {
+    expect(computeSessionScale(1, 5, "00:00:00")).toBeGreaterThanOrEqual(1);
+  });
+
+  it("large area gives a larger scale than a small area", () => {
+    const large = computeSessionScale(200, 40, "00:00:00");
+    const small = computeSessionScale(40, 8, "00:00:00");
+    expect(large).toBeGreaterThan(small);
+  });
+
+  it("respects maxScale option (caps at given value)", () => {
+    // Without cap, 200x40 would give scale > 2; with maxScale:2 must cap at 2.
+    const capped = computeSessionScale(200, 40, "00:00:00", { maxScale: 2 });
+    expect(capped).toBeLessThanOrEqual(2);
+    expect(capped).toBeGreaterThanOrEqual(1);
+  });
+
+  it("default cap is 4 (large terminal exceeds old cap-3 limit)", () => {
+    // computeScale caps at 3; computeSessionScale caps at 4 by default.
+    // On a very large terminal (9999x9999) with 92%/95% factors the col factor
+    // easily reaches 4 before the 4-cap bites.
+    const s = computeSessionScale(9999, 9999, "00:00:00");
+    expect(s).toBe(4);
   });
 });
 
