@@ -66,3 +66,24 @@ export function renderBigLines(time: string, scale = 1): string[] {
 export function bigWidth(time: string, scale = 1): number {
   return renderBigLines(time, scale)[0]?.length ?? 0;
 }
+
+/**
+ * Largest integer scale (>=1) that fits `time` in an area the CALLER has
+ * already reserved (i.e. metadata/footer space is subtracted before calling).
+ * Targets ~92% of the area so the counter is prominent but keeps a little air.
+ * Caller must still verify the block fits at scale 1 for very small areas
+ * (areaCols >= bigWidth(time,1)); this returns >=1 regardless.
+ */
+export function computeSessionScale(
+  areaCols: number,
+  areaRows: number,
+  time: string,
+  opts: { maxScale?: number } = {},
+): number {
+  const baseW = bigWidth(time, 1);
+  if (baseW === 0) return 1;
+  const ws = Math.floor((areaCols * 0.92) / baseW);
+  const hs = Math.floor((areaRows * 0.95) / BIG_ROWS);
+  const cap = opts.maxScale ?? 4;
+  return Math.max(1, Math.min(ws, hs, cap));
+}

@@ -80,12 +80,12 @@ export function buildProgram(): Command {
     .version(VERSION, "-V, --version", "print version");
   addGlobalFlags(program);
 
-  // start — default command (runs when no subcommand is given).
+  // start — launches the Flowtime session (routes to dashboard in a TTY).
   addGlobalFlags(
     program
-      .command("start", { isDefault: true })
+      .command("start")
       .description(
-        "start a Flowtime session (HUD in a TTY; --duration headless)",
+        "start a Flowtime session (dashboard in a TTY; --bare for standalone HUD; --duration headless)",
       )
       .option(
         "-d, --duration <seconds>",
@@ -100,6 +100,7 @@ export function buildProgram(): Command {
       .option("--target <dur>", "focus target, e.g. 1h or 90m")
       .option("--break-budget <dur>", "break budget, e.g. 20m")
       .option("--zen", "minimal HUD: clock only, no controls footer")
+      .option("--bare", "standalone HUD without the dashboard")
       .action((opts, cmd: Command) =>
         guard("start", cmd, (ctx) => {
           let target: number | undefined;
@@ -131,6 +132,7 @@ export function buildProgram(): Command {
             target,
             breakBudget,
             zen: opts.zen as boolean | undefined,
+            bare: opts.bare as boolean | undefined,
           });
         }),
       ),
@@ -289,16 +291,17 @@ export function buildProgram(): Command {
       .action((_opts, cmd: Command) => guard("mcp", cmd, () => runMcp())),
   );
 
-  // dashboard
+  // dashboard — default command (runs when no subcommand is given).
   addGlobalFlags(
     program
-      .command("dashboard")
+      .command("dashboard", { isDefault: true })
       .aliases(["dash", "tui"])
       .description(
         "open the interactive Flowtime dashboard (TUI; --json for a snapshot)",
       )
-      .action((_opts, cmd: Command) =>
-        guard("dashboard", cmd, (ctx) => runDashboard(ctx, {})),
+      .option("--view <name>", "open on a view: session|overview|sessions|goals|breaks|help")
+      .action((opts, cmd: Command) =>
+        guard("dashboard", cmd, (ctx) => runDashboard(ctx, { view: opts.view as string | undefined })),
       ),
   );
 

@@ -33,8 +33,8 @@ export const ConfigSchema = z.object({
   apiEndpoint: z.string().url().nullable().default(null),
   /** Optional big ASCII display (v0.3.0). */
   bigFont: z.boolean().default(false),
-  /** HUD display style: "simple" (default) or "block". */
-  displayStyle: z.enum(["simple", "block"]).default("simple"),
+  /** HUD display style: "simple" or "block" (default). */
+  displayStyle: z.enum(["simple", "block"]).default("block"),
   /** Whether to show the key-controls legend in the HUD. */
   showControls: z.boolean().default(true),
   /** Daily focus goal in seconds (default 4 h). */

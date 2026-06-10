@@ -13,7 +13,7 @@ export const ANSI = {
   cursorTo: (row: number, col: number) => `\x1b[${row};${col}H`,
 };
 
-import { renderBigLines, bigWidth, computeScale, BIG_ROWS } from "./bigfont.js";
+import { renderBigLines, bigWidth, computeScale, computeSessionScale, BIG_ROWS } from "./bigfont.js";
 import type { BreakCategory } from "../schemas/session.js";
 import { humanDuration } from "./format.js";
 import { breakRatio } from "./flowtime.js";
@@ -163,6 +163,18 @@ export function renderHud(state: HudState): string {
   const { rows, cols, time, style, zen } = state;
   if (!Number.isFinite(rows) || !Number.isFinite(cols)) return "";
 
+  // ── Build optional progress block and footer strings ─────────────────────
+  // These must be computed first so the block-style clock can reserve their
+  // vertical space before choosing its scale.
+  const showExtras = !zen;
+  let progressLines: string[] = [];
+  let footerLines: string[] = [];
+
+  if (showExtras) {
+    progressLines = buildProgressLines(state);
+    footerLines = buildFooterLines(state);
+  }
+
   // ── Compute clock block dimensions ────────────────────────────────────────
   let clockLines: string[];
   let clockWidth: number;
@@ -175,8 +187,21 @@ export function renderHud(state: HudState): string {
       clockLines = [time];
       clockWidth = time.length;
       clockHeight = 1;
+    } else if (zen) {
+      // Zen: no extras, fill the full area with the clock
+      const scale = computeSessionScale(cols, rows, time);
+      clockLines = renderBigLines(time, scale);
+      clockHeight = BIG_ROWS * scale;
+      clockWidth = clockLines[0]?.length ?? 0;
     } else {
-      const scale = computeScale(cols, rows, time);
+      // Reserve rows for progress and footer before choosing scale so the
+      // counter never crowds the metadata/footer out of the layout.
+      const progressGapR = progressLines.length > 0 ? 1 : 0;
+      const footerGapR = footerLines.length > 0 ? 1 : 0;
+      const reserved =
+        progressLines.length + progressGapR + footerLines.length + footerGapR;
+      const availableRows = Math.max(BIG_ROWS, rows - reserved);
+      const scale = computeSessionScale(cols, availableRows, time);
       clockLines = renderBigLines(time, scale);
       clockHeight = BIG_ROWS * scale;
       clockWidth = clockLines[0]?.length ?? 0;
@@ -186,16 +211,6 @@ export function renderHud(state: HudState): string {
     clockLines = [time];
     clockWidth = time.length;
     clockHeight = 1;
-  }
-
-  // ── Build optional progress block and footer strings ──────────────────────
-  const showExtras = !zen;
-  let progressLines: string[] = [];
-  let footerLines: string[] = [];
-
-  if (showExtras) {
-    progressLines = buildProgressLines(state);
-    footerLines = buildFooterLines(state);
   }
 
   // ── Total height needed ───────────────────────────────────────────────────

@@ -10,10 +10,13 @@ import { readSessions } from "../lib/session.js";
 import { sessionsPathFor } from "../lib/config.js";
 import { buildSnapshot } from "../lib/snapshot.js";
 import { jsonSuccess, printJson } from "../lib/output.js";
-import { runDashboardApp } from "../tui/app.js";
+import { runDashboardApp, VIEWS } from "../tui/app.js";
+import type { ViewName } from "../tui/app.js";
+import { ExitCode, fail } from "../lib/exit.js";
 
-// No additional options beyond the global flags at this stage.
-export type DashboardOptions = Record<string, never>;
+export interface DashboardOptions {
+  view?: string;
+}
 
 /**
  * Entry point for the `dashboard` command.
@@ -24,8 +27,17 @@ export type DashboardOptions = Record<string, never>;
  */
 export async function runDashboard(
   ctx: CommandContext,
-  _opts: DashboardOptions = {},
+  opts: DashboardOptions = {},
 ): Promise<void> {
+  // Validate --view early (before any alt-screen) so a typo fails with a clear
+  // USAGE error instead of crashing the TUI mid-render.
+  if (opts.view !== undefined && !VIEWS.includes(opts.view as ViewName)) {
+    fail(
+      ExitCode.USAGE,
+      `unknown view '${opts.view}' (expected: ${VIEWS.join("|")})`,
+    );
+  }
+
   const file = sessionsPathFor(ctx.config, ctx.paths);
   const { sessions } = readSessions(file);
 
@@ -35,5 +47,7 @@ export async function runDashboard(
     return;
   }
 
-  await runDashboardApp(ctx, sessions);
+  await runDashboardApp(ctx, sessions, {
+    initialView: opts.view as ViewName | undefined,
+  });
 }

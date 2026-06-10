@@ -91,7 +91,7 @@ export function buildManifest(): Manifest {
       {
         name: "start",
         summary:
-          "Start a Flowtime session. Interactive HUD in a TTY; headless timed session with --duration.",
+          "Start a Flowtime session inside the dashboard's Session view (TTY). Use --bare for the standalone HUD; headless timed session with --duration.",
         flags: [
           {
             name: "--duration",
@@ -137,7 +137,12 @@ export function buildManifest(): Manifest {
           {
             name: "--zen",
             type: "boolean",
-            description: "Minimal HUD: clock only, no controls footer.",
+            description: "Minimal clock-only display; compact, no footer or metadata.",
+          },
+          {
+            name: "--bare",
+            type: "boolean",
+            description: "Standalone HUD (bypasses the dashboard); like the old default TTY behaviour.",
           },
         ],
         jsonData:
@@ -146,6 +151,7 @@ export function buildManifest(): Manifest {
           "flowclock start",
           "flowclock start --goal 'Deep work' --duration 1500 --json",
           "flowclock start --target 1h --break-budget 20m",
+          "flowclock start --goal 'Deep work' --target 1h --break-budget 20m --bare",
         ],
       },
       {
@@ -284,11 +290,22 @@ export function buildManifest(): Manifest {
       {
         name: "dashboard",
         summary:
-          "Interactive Flowtime dashboard TUI (aliases: dash, tui). Requires a TTY. Use --json to emit a DashboardSnapshot for agents without a TTY.",
-        flags: [],
+          "DEFAULT command — interactive Flowtime dashboard TUI (aliases: dash, tui). Hosts live sessions, stats, goals, breaks, and help views. Requires a TTY. Use --json to emit a DashboardSnapshot for agents without a TTY.",
+        flags: [
+          {
+            name: "--view",
+            type: "string",
+            description:
+              "Open directly on a named view: session|overview|sessions|goals|breaks|help.",
+          },
+        ],
         jsonData:
           "DashboardSnapshot { generatedAt, stats: StatsSummary, game: GameSummary, goals: GoalSummary[], recent: Session[] }.",
-        examples: ["flowclock dashboard", "flowclock dashboard --json"],
+        examples: [
+          "flowclock dashboard",
+          "flowclock dashboard --json",
+          "flowclock dashboard --view help",
+        ],
       },
       {
         name: "mcp",

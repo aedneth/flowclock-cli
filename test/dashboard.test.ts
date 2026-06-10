@@ -2,6 +2,9 @@
  * Tests for Stage E: dashboard views (pure renderers) and the --json / non-TTY
  * path of runDashboard.
  *
+ * WS5 additions: buildFrame (session view + palette overlay), compositeOverlay,
+ * and the help view.
+ *
  * We do NOT test the interactive TUI loop against a real TTY.
  */
 
@@ -11,6 +14,7 @@ import type { DashboardSnapshot } from "../src/lib/snapshot.js";
 import { buildSnapshot } from "../src/lib/snapshot.js";
 import type { Rect } from "../src/lib/tui/layout.js";
 import { displayWidth } from "../src/lib/tui/draw.js";
+import { Timer } from "../src/lib/timer.js";
 
 // Views under test
 import { renderOverview } from "../src/tui/views/overview.js";
@@ -18,6 +22,11 @@ import { renderSessions, sessionDetail } from "../src/tui/views/sessions.js";
 import type { SessionsState } from "../src/tui/views/sessions.js";
 import { renderGoals } from "../src/tui/views/goals.js";
 import { renderBreaks } from "../src/tui/views/breaks.js";
+
+// App under test (WS5)
+import { buildFrame, compositeOverlay } from "../src/tui/app.js";
+import type { LiveSession } from "../src/tui/app.js";
+import { emptyPaletteState } from "../src/tui/palette.js";
 
 // Command under test
 import { runDashboard } from "../src/commands/dashboard.js";
@@ -584,5 +593,238 @@ describe("runDashboard (non-TTY / --json)", () => {
     expect(parsed.data.game).toHaveProperty("achievements");
     expect(Array.isArray(parsed.data.goals)).toBe(true);
     expect(Array.isArray(parsed.data.recent)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// buildFrame — WS5: session view, palette overlay, help view
+// ---------------------------------------------------------------------------
+
+describe("buildFrame (WS5)", () => {
+  function makeFakeCtx(): CommandContext {
+    return {
+      config: {
+        schemaVersion: 1,
+        theme: "neon",
+        keybindings: { pause: "p", reset: "r", quit: "q", break: "b", category: "c" },
+        sessionsPath: null,
+        apiEndpoint: null,
+        bigFont: false,
+        displayStyle: "simple",
+        showControls: true,
+        dailyFocusGoalS: 14400,
+      } satisfies Config,
+      paths: {
+        configDir: "/tmp",
+        dataDir: "/tmp",
+        configFile: "/tmp/config.json",
+        sessionsFile: "/tmp/nonexistent-sessions-buildframe-test.json",
+      } satisfies FlowclockPaths,
+      logger: { info: () => {}, warn: () => {}, error: () => {} },
+      json: false,
+      color: false,
+      yes: false,
+      isTTY: false,
+      env: {},
+    };
+  }
+
+  it("session view (idle) — contains idle prompt", () => {
+    const ctx = makeFakeCtx();
+    const state = {
+      view: "session" as const,
+      sessions: [],
+      selectedIndex: 0,
+      scrollTop: 0,
+      detailOpen: false,
+      live: null,
+      palette: emptyPaletteState(),
+      summary: null,
+      theme: "neon" as const,
+    };
+    const frame = buildFrame(state, 80, 24, ctx);
+    const combined = frame.map(stripAnsi).join("\n");
+    // Session view should render the panel title
+    expect(combined).toContain("Session");
+    // Idle state shows the prompt
+    expect(combined).toContain("No active session");
+  });
+
+  it("session view with live session — footer contains pause keybinding", () => {
+    const ctx = makeFakeCtx();
+    const timer = new Timer();
+    const live: LiveSession = {
+      timer,
+      goal: "test-goal",
+      label: null,
+      focusTargetS: null,
+      breakBudgetS: null,
+    };
+    const state = {
+      view: "session" as const,
+      sessions: [],
+      selectedIndex: 0,
+      scrollTop: 0,
+      detailOpen: false,
+      live,
+      palette: emptyPaletteState(),
+      summary: null,
+      theme: "neon" as const,
+    };
+    const frame = buildFrame(state, 80, 24, ctx);
+    const combined = frame.map(stripAnsi).join("\n");
+    // Footer should contain the pause keybinding hint
+    expect(combined).toContain("pause");
+    // The live goal should appear in the body
+    expect(combined).toContain("test-goal");
+  });
+
+  it("session view with live session — frame contains exactly 24 rows", () => {
+    const ctx = makeFakeCtx();
+    const timer = new Timer();
+    const live: LiveSession = {
+      timer,
+      goal: null,
+      label: null,
+      focusTargetS: null,
+      breakBudgetS: null,
+    };
+    const state = {
+      view: "session" as const,
+      sessions: [],
+      selectedIndex: 0,
+      scrollTop: 0,
+      detailOpen: false,
+      live,
+      palette: emptyPaletteState(),
+      summary: null,
+      theme: "neon" as const,
+    };
+    const frame = buildFrame(state, 80, 24, ctx);
+    expect(frame).toHaveLength(24);
+  });
+
+  it("palette open — frame contains 'Commands' panel title", () => {
+    const ctx = makeFakeCtx();
+    const state = {
+      view: "session" as const,
+      sessions: [],
+      selectedIndex: 0,
+      scrollTop: 0,
+      detailOpen: false,
+      live: null,
+      palette: { open: true, query: "", selected: 0 },
+      summary: null,
+      theme: "neon" as const,
+    };
+    const frame = buildFrame(state, 80, 24, ctx);
+    const combined = frame.map(stripAnsi).join("\n");
+    expect(combined).toContain("Commands");
+  });
+
+  it("help view — frame contains 'Flowtime' text", () => {
+    const ctx = makeFakeCtx();
+    const state = {
+      view: "help" as const,
+      sessions: [],
+      selectedIndex: 0,
+      scrollTop: 0,
+      detailOpen: false,
+      live: null,
+      palette: emptyPaletteState(),
+      summary: null,
+      theme: "neon" as const,
+    };
+    const frame = buildFrame(state, 80, 24, ctx);
+    const combined = frame.map(stripAnsi).join("\n");
+    expect(combined).toContain("Flowtime");
+  });
+
+  it("overview view — frame contains 'Overview'", () => {
+    const ctx = makeFakeCtx();
+    const state = {
+      view: "overview" as const,
+      sessions: [],
+      selectedIndex: 0,
+      scrollTop: 0,
+      detailOpen: false,
+      live: null,
+      palette: emptyPaletteState(),
+      summary: null,
+      theme: "neon" as const,
+    };
+    const frame = buildFrame(state, 80, 24, ctx);
+    const combined = frame.map(stripAnsi).join("\n");
+    expect(combined).toContain("Overview");
+  });
+
+  it("returns exactly `rows` rows", () => {
+    const ctx = makeFakeCtx();
+    const state = {
+      view: "overview" as const,
+      sessions: [],
+      selectedIndex: 0,
+      scrollTop: 0,
+      detailOpen: false,
+      live: null,
+      palette: emptyPaletteState(),
+      summary: null,
+      theme: "neon" as const,
+    };
+    const frame = buildFrame(state, 80, 30, ctx);
+    expect(frame).toHaveLength(30);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// compositeOverlay — pure overlay compositing
+// ---------------------------------------------------------------------------
+
+describe("compositeOverlay", () => {
+  it("places overlay rows at the specified position", () => {
+    const frame = [
+      "                    ", // 20 wide
+      "                    ",
+      "                    ",
+      "                    ",
+    ];
+    const overlay = {
+      rows: ["[HELLO]"],
+      top: 1,
+      left: 2,
+    };
+    const result = compositeOverlay(frame, overlay, 20);
+    expect(result[1]).toContain("HELLO");
+  });
+
+  it("preserves rows not covered by overlay", () => {
+    const frame = [
+      "AAAAAAAA            ", // 20 wide
+      "BBBBBBBB            ",
+      "CCCCCCCC            ",
+    ];
+    const overlay = { rows: ["[XX]"], top: 1, left: 0 };
+    const result = compositeOverlay(frame, overlay, 20);
+    // Row 0 should be unchanged
+    expect(result[0]).toBe(frame[0]);
+    // Row 2 should be unchanged
+    expect(result[2]).toBe(frame[2]);
+  });
+
+  it("each row in result has exactly `cols` display width", () => {
+    const frame = Array.from({ length: 5 }, () => " ".repeat(40));
+    const overlay = { rows: ["[CMD]", "[OPT]"], top: 1, left: 5 };
+    const result = compositeOverlay(frame, overlay, 40);
+    for (const row of result) {
+      expect(displayWidth(row)).toBe(40);
+    }
+  });
+
+  it("clips overlay rows that fall outside frame bounds", () => {
+    const frame = ["          "]; // 10 wide, 1 row
+    const overlay = { rows: ["[OUT]"], top: 5, left: 0 }; // beyond frame
+    const result = compositeOverlay(frame, overlay, 10);
+    expect(result).toHaveLength(1);
+    expect(result[0]).toBe(frame[0]); // unchanged
   });
 });
