@@ -60,7 +60,7 @@ function checkTTY(ctx: CommandContext): Check {
     name: "tty",
     ok: true,
     detail: ctx.isTTY
-      ? "interactive TTY (HUD available)"
+      ? "interactive TTY (dashboard is the default; --bare for standalone HUD)"
       : "no TTY (agent mode; use --duration / --json)",
   };
 }

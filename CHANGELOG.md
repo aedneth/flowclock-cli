@@ -6,6 +6,63 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.0.0] - 2026-06-09
+
+flowclock v3 unifies everything into **the interactive dashboard as the default
+command**. Running `flowclock` with no subcommand now opens the dashboard directly
+— a live, themed control center that hosts sessions, stats, goals, breaks, and
+help in one place. The session experience gets a major upgrade: a **Session hero
+view** with a big, balanced live counter takes centre stage, with full session
+controls embedded inside the dashboard.
+
+### Added
+
+- **Unified interactive dashboard as the default command.** `flowclock` with no
+  subcommand now opens the dashboard. The old "start a session" default is the
+  breaking change motivating the v3 major bump.
+- **Session hero view** inside the dashboard: a **big balanced live counter**
+  (scales "reserve-first" so it stays prominent without overshadowing metadata),
+  goal line, focus-target progress bar, break budget, focus:rest ratio, and a
+  per-context controls footer — all rendered live inside the running dashboard.
+- **Help view** (view 6 — `6` or Tab to reach) for newcomers: describes all
+  views, key bindings, and common workflows.
+- **Optional `/` command palette** — a transient, centered overlay triggered by
+  `/`. Dismiss with `Esc`. It is **not** a permanent bar — it appears only when
+  invoked, keeping the dashboard chrome minimal.
+- **Live session hosting** in the dashboard: start, pause, break, pick category,
+  reset, and stop entirely from within the dashboard. Session state persists on
+  stop, exactly as before.
+- **`start --bare`** — routes `flowclock start` to the old standalone HUD,
+  bypassing the dashboard. Headless/`--duration`/non-TTY/`--json`/`--zen` paths
+  are unchanged.
+- **`dashboard --view <name>`** — open the dashboard directly on a named view:
+  `session`, `overview`, `sessions`, `goals`, `breaks`, or `help`.
+- **Live theme switching** inside the dashboard without restarting.
+
+### Changed
+
+- **`flowclock` with no subcommand now opens the dashboard** (was: start a
+  session). This is the breaking change motivating the major version bump.
+- **Default `displayStyle` is now `block`** (big 7-segment counter). `simple`
+  and `--zen` remain compact opt-ins; `config set displayStyle simple` restores
+  the compact clock.
+- **Counter scaling is now "reserve-first"**: the big counter always gets ample
+  vertical space before the surrounding metadata is rendered, so it never
+  appears cramped in standard terminal sizes.
+- The dashboard now exposes six named views: **1 Session · 2 Overview ·
+  3 Sessions · 4 Goals · 5 Breaks · 6 Help**, navigable by Tab or number keys.
+- The `start` command description updated to reflect that in a TTY it routes
+  into the dashboard's Session view (unless `--bare` is supplied).
+- `doctor` TTY check now reports "dashboard is the default; --bare for
+  standalone HUD" when a TTY is detected.
+
+### Fixed
+
+- The counter no longer renders tiny in the default display path — the big
+  counter is now first-class, not opt-in extra.
+- The big counter no longer overshadows surrounding session info — reserve-first
+  scaling keeps metadata visible alongside the hero clock.
+
 ## [2.0.0] - 2026-06-09
 
 flowclock grows from a count-up HUD into a **Flowtime control center**: it now
@@ -121,7 +178,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.0.0...HEAD
+[3.0.0]: https://github.com/aedneth/flowclock-cli/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/aedneth/flowclock-cli/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/aedneth/flowclock-cli/compare/v0.1.0...v1.0.0
 [0.1.0]: https://github.com/aedneth/flowclock-cli/releases/tag/v0.1.0

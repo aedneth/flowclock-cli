@@ -53,17 +53,23 @@ Alacritty, Windows Terminal, GNOME Terminal, …).
 ## Quickstart
 
 ```bash
-flowclock                                    # start a focus session (the HUD)
-flowclock start --goal "Ship v2" \
-                --target 1h --break-budget 20m   # play the focus/budget game
-flowclock dashboard                          # open the interactive TUI dashboard
-flowclock stats                              # flow score, ratio, streak, achievements
+flowclock                                        # open the dashboard (default — v3)
+flowclock start --goal "Deep work — StreamNet" \
+                --target 1h --break-budget 20m   # start a session inside the dashboard
+flowclock start --bare                           # standalone HUD, bypasses the dashboard
+flowclock stats                                  # flow score, ratio, streak, achievements
 ```
+
+`flowclock` with no subcommand opens the **interactive dashboard** directly —
+your Flowtime control center. From there you start, pause, take breaks, and stop
+sessions without leaving the TUI. Use **`Tab`** or **`1`–`6`** to switch views.
 
 ## The HUD
 
-`flowclock` (or `flowclock start`) opens a clean, centered clock with a discreet
-controls footer:
+`flowclock start --bare` opens a clean, centered standalone clock with a discreet
+controls footer (bypassing the dashboard). In a normal TTY, `flowclock start`
+routes you into the dashboard's Session hero view instead — same controls, richer
+context. The HUD is also used for headless/`--duration`/non-TTY runs.
 
 ```
                               00:42:17
@@ -114,8 +120,10 @@ Ratio   1:4.3 focus:rest
 
 ## Display styles & themes
 
-- **`displayStyle`** — `simple` (default, the centered clock) or `block`
-  (7-segment ASCII). Override per session with `start --big`.
+- **`displayStyle`** — `block` (default from v3, the big 7-segment counter in
+  the Session hero view) or `simple` (compact centered clock). `config set
+  displayStyle simple` restores the compact style. Override per session with
+  `start --big`.
 
   ```
   ████   █    ████ ████   █  █ ████
@@ -130,10 +138,79 @@ Ratio   1:4.3 focus:rest
 
 ## The dashboard
 
-**`flowclock dashboard`** (aliases `dash`, `tui`) opens a flicker-free, navigable
-control center — a program running *inside* your terminal, no file-spelunking
-required. It's built on a small in-house raw-ANSI TUI (alt-screen + double-buffer
-diff renderer): zero new dependencies, same instant feel.
+**`flowclock`** (no subcommand) or **`flowclock dashboard`** (aliases `dash`,
+`tui`) opens the dashboard — the **default entry point since v3**. It's a
+flicker-free, navigable control center built on a small in-house raw-ANSI TUI
+(alt-screen + double-buffer diff renderer): zero new dependencies, same instant
+feel. Open directly on a specific view with `--view <name>` (e.g.
+`flowclock dashboard --view help`).
+
+### Views
+
+The dashboard has **six views**, navigable by **`Tab`** or the number keys:
+
+| Key | View | Contents |
+| --- | ---- | -------- |
+| `1` | **Session** | Live session hero (big counter, goal, target progress, break budget, ratio, controls footer) |
+| `2` | **Overview** | Today's totals, flow-score gauge, daily goal, streaks, 7-day chart, achievements |
+| `3` | **Sessions** | Scrollable history + per-session focus/break timeline |
+| `4` | **Goals** | Per-goal rollups: focus time, count, hit/miss, target/budget |
+| `5` | **Breaks** | Time by category (meal/exercise/walk/…) and focus-vs-rest balance |
+| `6` | **Help** | Key bindings, view descriptions, and common workflows for newcomers |
+
+### Session hero view (view 1)
+
+The Session view hosts a **live, interactive session** inside the dashboard.
+The big 7-segment counter is scaled "reserve-first" — it gets ample vertical
+space before the surrounding metadata, so it never appears cramped:
+
+```
+ Flowclock Dashboard   12:23:28   [1:Session]  2:Overview  3:Sessions  4:Goals  5:Breaks  6:Help
+ ╔══════════════════════════════════════════════════════════╗
+ ║  Deep work — StreamNet                                   ║
+ ║                                                          ║
+ ║    ████   █  ████  ████  ██ ████                         ║
+ ║    █  █  ██     █     █ █ █    █                         ║
+ ║    █  █   █   ███   ███  ████  ██                        ║
+ ║    █  █   █  █        █ █    █   █                       ║
+ ║    ████  ███ ████ ████      █ ████                       ║
+ ║                                                          ║
+ ║  goal · 42m/1h ███████░░░ 70%   break 06:00/20:00 · ratio 1:7.0   ║
+ ║  [p] pause  [b] break  [1-6] category  [r] reset  [q] stop & save ║
+ ╚══════════════════════════════════════════════════════════╝
+```
+
+Live session controls inside the dashboard:
+
+| Key | Action |
+| --- | ------ |
+| `p` | Pause / resume |
+| `b` | Start / end a break |
+| `1`–`6` | Pick break category (rest · meal · exercise · walk · distraction · other) |
+| `r` | Reset the session clock |
+| `q` | Stop & save the session, return to Overview |
+
+### Command palette
+
+Press **`/`** to open a transient, centered command-palette overlay. It is **not
+a permanent bar** — it appears only when invoked and disappears when you press
+**`Esc`** or select a command, keeping the dashboard chrome minimal.
+
+### Navigation
+
+```
+[Tab] / [1–6]  switch view     [↑↓] / [j k]  scroll
+[Enter]        detail          [r]            refresh
+[/]            command palette [q] / [Esc]    quit / close overlay
+```
+
+The dashboard restores your terminal cleanly on exit — no artifacts.
+
+### Agent snapshot (no TTY)
+
+```bash
+flowclock dashboard --json   # emits DashboardSnapshot, never launches the TUI
+```
 
 ```
  Flowclock Dashboard   12:23:28   [1:Overview]  2:Sessions  3:Goals  4:Breaks
@@ -148,17 +225,6 @@ diff renderer): zero new dependencies, same instant feel.
  └──────────────────────────────────────────────────────────────────────────┘
  [Tab] view · [↑↓] move · [Enter] detail · [r] refresh · [q] quit
 ```
-
-- **Overview** — today's focus/break totals, focus:rest ratio, flow-score gauge,
-  daily-maximization bar, streaks, last-7-days chart, latest achievements.
-- **Sessions** — scrollable history; press **`Enter`** for a per-session **timeline**
-  of focus and break intervals with their categories and durations.
-- **Goals** — per-goal rollups: focus time, break time, count, hit/miss, target/budget.
-- **Breaks** — time by category (meal/exercise/walk/…) and focus-vs-rest balance.
-
-Navigate with **`Tab`** / **`1`–`4`** (views), **`↑↓`** / **`j` `k`** (move),
-**`Enter`** (detail), **`r`** (refresh), **`q`** / **`Esc`** (quit). It restores your
-terminal cleanly on exit — no artifacts.
 
 ## Gamification
 
@@ -241,7 +307,7 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `theme` | `neon` | `neon` · `amber` · `blue` · `mono` |
-| `displayStyle` | `simple` | `simple` clock or `block` 7-segment |
+| `displayStyle` | `block` | `block` 7-segment (default from v3) or `simple` compact clock |
 | `showControls` | `true` | show the controls footer (`--zen` overrides) |
 | `dailyFocusGoalS` | `14400` | daily focus goal in seconds (drives maximization %) |
 | `keybindings.{pause,break,category,reset,quit}` | `p` `b` `c` `r` `q` | in-session keys |
@@ -267,7 +333,8 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v0.1.0** ✅ | Core HUD, silent logging, `stats`/`history`/`config`/`doctor`, agent-native layer, MCP server |
 | **v1.0.0** ✅ | Goals mode, daily streaks, theme override + `--big`, weekly export, shell completions, schema v2 |
 | **v2.0.0** ✅ | Flowtime break model (categories), targets + break budgets, proportional breaks, gamification (flow score/achievements), interactive TUI dashboard, visible controls + `--zen`, schema v3 |
-| **v2.1.0** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
+| **v3.0.0** ✅ | Dashboard as default command; Session hero view (big balanced counter, live controls); Help view; `/` command palette; `start --bare`; `dashboard --view`; live theme switching; reserve-first counter scaling |
+| **v3.1.0** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 
 ## Contributing

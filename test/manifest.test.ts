@@ -34,12 +34,19 @@ describe("manifest", () => {
     expect(dashboard!.jsonData).toContain("DashboardSnapshot");
   });
 
-  it("start command exposes --target, --break-budget, and --zen flags", () => {
+  it("start command exposes --target, --break-budget, --zen, and --bare flags", () => {
     const start = m.commands.find((c) => c.name === "start")!;
     const flagNames = (start.flags ?? []).map((f) => f.name);
     expect(flagNames).toContain("--target");
     expect(flagNames).toContain("--break-budget");
     expect(flagNames).toContain("--zen");
+    expect(flagNames).toContain("--bare");
+  });
+
+  it("dashboard command exposes --view flag", () => {
+    const dashboard = m.commands.find((c) => c.name === "dashboard")!;
+    const flagNames = (dashboard.flags ?? []).map((f) => f.name);
+    expect(flagNames).toContain("--view");
   });
 
   it("start jsonData mentions v3 session fields", () => {
