@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   renderBigLines,
   renderOutlineLines,
+  renderSimpleLines,
   bigWidth,
   computeScale,
   computeSessionScale,
@@ -171,5 +172,47 @@ describe("renderOutlineLines (minimal / simple style)", () => {
 
   it("never throws on unexpected characters", () => {
     expect(() => renderOutlineLines("ab", 2)).not.toThrow();
+  });
+});
+
+describe("renderSimpleLines (heavy line / seven-segment style)", () => {
+  it("matches the solid block's exact dimensions at the same scale", () => {
+    for (const scale of [1, 2, 3]) {
+      const solid = renderBigLines("12:34:56", scale);
+      const line = renderSimpleLines("12:34:56", scale);
+      expect(line).toHaveLength(solid.length);
+      line.forEach((row, i) => {
+        expect(row.length).toBe(solid[i]!.length);
+      });
+      // Width parity with the block font keeps the reserve-first maths identical.
+      expect(line[0]!.length).toBe(bigWidth("12:34:56", scale));
+    }
+  });
+
+  it("draws heavy box-drawing strokes, never solid blocks", () => {
+    const joined = renderSimpleLines("12:34:56", 2).join("");
+    expect(joined).not.toContain("█");
+    expect(joined).toContain("┃");
+    expect(joined).toContain("━");
+  });
+
+  it("renders colon dots", () => {
+    expect(renderSimpleLines("00:00", 2).join("")).toContain("●");
+  });
+
+  it("is visually DISTINCT from block at scale 1 (fixes the small-window toggle)", () => {
+    // The old outline coincided with block at scale 1; the line font must not.
+    const line = renderSimpleLines("12:34:56", 1).join("\n");
+    const block = renderBigLines("12:34:56", 1).join("\n");
+    expect(line).not.toBe(block);
+  });
+
+  it("scale=2 doubles the row count", () => {
+    expect(renderSimpleLines("0", 2).length).toBe(renderSimpleLines("0", 1).length * 2);
+  });
+
+  it("never throws on unexpected characters", () => {
+    expect(() => renderSimpleLines("ab", 2)).not.toThrow();
+    expect(renderSimpleLines("?")).toHaveLength(BIG_ROWS);
   });
 });

@@ -6,6 +6,41 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.2.0] - 2026-06-10
+
+Refines the `simple` display style into a clean line font, adds a third
+`outline` style, and fixes a toggle that looked broken on small windows.
+
+### Added
+
+- **New `outline` display style.** The hollow, edge-traced block clock shipped in
+  v3.1.0 is now a **selectable style in its own right**. The display cycle is
+  `block → simple → outline` (press `d`, or `display` in the `/` palette). All
+  three are saved to your config.
+
+### Changed
+
+- **`simple` is now a clean heavy line font.** Instead of the edge-traced
+  outline, `simple` renders crisp seven-segment digits in heavy box-drawing
+  strokes (`┏━┓ ┃ ┣━┫ ┗━┛`) — minimal and airy, but scaled to the same
+  hero dimensions as `block` (it shares the exact reserve-first geometry).
+  (`renderSimpleLines` in bigfont; the old outline lives on as the `outline`
+  style via `renderOutlineLines`.)
+
+### Fixed
+
+- **Display-style toggle now visibly changes on small / tiled windows.** The old
+  outline coincided pixel-for-pixel with `block` at scale 1, so pressing `d` in a
+  small window appeared to do nothing — the difference only showed once the
+  window was large enough to scale up. The `simple` line font differs from
+  `block` at **every** scale (including scale 1), so the toggle is always visible.
+
+### Notes
+
+- **Public default is unchanged: `displayStyle` stays `block`** for everyone.
+- The standalone `--bare`/`--zen` HUD still renders the compact single line for
+  any non-`block` style; the scaled line fonts are a dashboard feature.
+
 ## [3.1.0] - 2026-06-10
 
 A usability follow-up to v3: you can now configure and start everything from
@@ -214,7 +249,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.1.0...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.2.0...HEAD
+[3.2.0]: https://github.com/aedneth/flowclock-cli/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aedneth/flowclock-cli/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aedneth/flowclock-cli/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/aedneth/flowclock-cli/compare/v1.0.0...v2.0.0

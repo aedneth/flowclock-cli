@@ -120,18 +120,23 @@ Ratio   1:4.3 focus:rest
 
 ## Display styles & themes
 
-- **`displayStyle`** — `block` (default from v3, the solid 7-segment counter in
-  the Session hero view) or `simple` (a minimal **outline** of the same large
-  counter — it now shares `block`'s reserve-first scaling instead of a tiny text
-  line). Toggle live in the dashboard with **`d`**, or `config set displayStyle
-  simple`. Override the standalone HUD per session with `start --big`.
+- **`displayStyle`** — three looks for the big counter in the Session hero view,
+  all sharing the same reserve-first scaling and dimensions. Cycle live in the
+  dashboard with **`d`** (or `config set displayStyle …`):
+  - **`block`** (default) — solid 7-segment glyphs.
+  - **`simple`** — clean heavy **line** digits in box-drawing strokes (`┏━┓ ┃
+    ┣━┫ ┗━┛`). Minimal and airy, but full hero size — distinct from `block` at
+    every scale, so the toggle is visible even on small / tiled windows.
+  - **`outline`** — a hollow, edge-traced version of the solid block.
+
+  Override the standalone HUD per session with `start --big`.
 
   ```
-  ████   █    ████ ████   █  █ ████
-  █  █  ██  █    █    █ █ █  █ █
-  █  █   █    ████  ███   ████ ████
-  █  █   █  █ █       █ █    █    █
-  ████  ███   ████ ████      █ ████
+  block            simple           outline
+  ████  ████       ┏━━┓ ┏━━┓        ████  ████
+  █  █  █  █       ┃  ┃ ┃  ┃        █  █  █  █
+  █  █  █  █       ┃  ┃ ┃  ┃        █  █  █  █
+  ████  ████       ┗━━┛ ┗━━┛        ████  ████
   ```
 
 - **Themes** — `neon` (default), `amber`, `blue`, `mono`. Set the default with
@@ -221,18 +226,21 @@ The shell entry point still works and behaves identically:
 flowclock start --goal "Deep work — StreamNet" --target 1h --break-budget 20m
 ```
 
-### Display style — `block` vs `simple` (toggle live)
+### Display style — `block` / `simple` / `outline` (cycle live)
 
-The Session counter has two looks, both using the **same reserve-first scaling**
+The Session counter has three looks, all using the **same reserve-first scaling**
 so they stay prominent without overshadowing the metadata:
 
 - **`block`** (default) — solid 7-segment glyphs.
-- **`simple`** — a minimal hollow outline of the same large digits.
+- **`simple`** — clean heavy **line** digits in box-drawing strokes; minimal but
+  full hero size. Distinct from `block` at every scale (including small windows).
+- **`outline`** — a hollow, edge-traced version of the solid block.
 
-Press **`d`** (or run `display` from the palette) to toggle between them, and
-**`t`** to cycle the theme. Both choices are **saved to your config** as your new
-default — the same as running `config set displayStyle simple` / `config set
-theme neon`. The public default stays `block`; `simple` is an opt-in alternate.
+Press **`d`** (or run `display` from the palette) to cycle
+`block → simple → outline`, and **`t`** to cycle the theme. Both choices are
+**saved to your config** as your new default — the same as running
+`config set displayStyle simple` / `config set theme neon`. The public default
+stays `block`; `simple` and `outline` are opt-in alternates.
 
 ### Command palette
 
@@ -353,7 +361,7 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `theme` | `neon` | `neon` · `amber` · `blue` · `mono` |
-| `displayStyle` | `block` | `block` solid 7-segment (default) or `simple` minimal outline (same scaling); toggle live with `d` |
+| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, or `outline` hollow block — all same scaling; cycle live with `d` |
 | `showControls` | `true` | show the controls footer (`--zen` overrides) |
 | `dailyFocusGoalS` | `14400` | daily focus goal in seconds (drives maximization %) |
 | `keybindings.{pause,break,category,reset,quit}` | `p` `b` `c` `r` `q` | in-session keys |

@@ -6,8 +6,13 @@ export const CONFIG_SCHEMA_VERSION = 1;
 export const ThemeNameSchema = z.enum(["neon", "amber", "blue", "mono"]);
 export type ThemeName = z.infer<typeof ThemeNameSchema>;
 
-/** HUD / counter display style: solid block (default) or minimal outline. */
-export const DisplayStyleSchema = z.enum(["simple", "block"]);
+/**
+ * HUD / counter display style:
+ *  - "block"   solid block glyphs (default)
+ *  - "simple"  clean heavy box-drawing seven-segment digits
+ *  - "outline" hollow edge-traced block glyphs
+ */
+export const DisplayStyleSchema = z.enum(["simple", "block", "outline"]);
 export type DisplayStyle = z.infer<typeof DisplayStyleSchema>;
 
 export const KeybindingsSchema = z.object({
@@ -37,7 +42,7 @@ export const ConfigSchema = z.object({
   apiEndpoint: z.string().url().nullable().default(null),
   /** Optional big ASCII display (v0.3.0). */
   bigFont: z.boolean().default(false),
-  /** HUD display style: "simple" (minimal outline) or "block" (default). */
+  /** HUD display style: "block" (default), "simple" (line digits) or "outline". */
   displayStyle: DisplayStyleSchema.default("block"),
   /** Whether to show the key-controls legend in the HUD. */
   showControls: z.boolean().default(true),

@@ -308,12 +308,11 @@ describe("renderSession — goal met state", () => {
 });
 
 // ---------------------------------------------------------------------------
-// displayStyle: "simple" (minimal outline) shares block's scaling/metadata
+// displayStyle: "simple" (heavy line digits) shares block's scaling/metadata
 // ---------------------------------------------------------------------------
 
 describe("renderSession — simple display style", () => {
   const simple = activeState({ displayStyle: "simple" });
-  const block = activeState({ displayStyle: "block" });
 
   it("returns exactly rect.height rows like block", () => {
     expect(renderSession(simple, rect(80, 24), "neon", false)).toHaveLength(24);
@@ -326,20 +325,52 @@ describe("renderSession — simple display style", () => {
     expect(joined).toContain("pause");
   });
 
-  it("still renders a big block-font counter (uses █ strokes, not a tiny text line)", () => {
+  it("renders a big line-art counter (box-drawing strokes, not a tiny text line)", () => {
+    // Note: a solid █ may still appear in the focus progress bar (metadata);
+    // the counter glyphs themselves use box-drawing strokes — see bigfont test.
     const joined = renderSession(simple, rect(80, 24), "neon", false).join("\n");
-    expect(joined).toContain("█");
+    expect(joined).toContain("┃");
+    expect(joined).toContain("━");
   });
 
-  it("is hollower than block: fewer █ cells at the same size", () => {
-    const simpleCount = renderSession(simple, rect(80, 24), "neon", false).join("").split("█").length - 1;
-    const blockCount = renderSession(block, rect(80, 24), "neon", false).join("").split("█").length - 1;
-    expect(simpleCount).toBeLessThan(blockCount);
-    expect(simpleCount).toBeGreaterThan(0);
+  it("is visibly DIFFERENT from block (fixes the small/large window toggle)", () => {
+    const simpleRows = renderSession(simple, rect(80, 24), "neon", false).join("\n");
+    const blockRows = renderSession(activeState({ displayStyle: "block" }), rect(80, 24), "neon", false).join("\n");
+    expect(simpleRows).not.toBe(blockRows);
   });
 
   it("all rows within width 80", () => {
     for (const row of renderSession(simple, rect(80, 24), "neon", false)) {
+      expect(displayWidth(row)).toBeLessThanOrEqual(80);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// displayStyle: "outline" (hollow edge-traced block) — third selectable style
+// ---------------------------------------------------------------------------
+
+describe("renderSession — outline display style", () => {
+  const outline = activeState({ displayStyle: "outline" });
+  const block = activeState({ displayStyle: "block" });
+
+  it("returns exactly rect.height rows and keeps metadata", () => {
+    const rows = renderSession(outline, rect(80, 24), "neon", false);
+    expect(rows).toHaveLength(24);
+    const joined = rows.join("\n");
+    expect(joined).toContain("Deep work");
+    expect(joined).toContain("pause");
+  });
+
+  it("hollows out the block: fewer █ cells than solid block at the same size", () => {
+    const outlineCount = renderSession(outline, rect(80, 24), "neon", false).join("").split("█").length - 1;
+    const blockCount = renderSession(block, rect(80, 24), "neon", false).join("").split("█").length - 1;
+    expect(outlineCount).toBeGreaterThan(0);
+    expect(outlineCount).toBeLessThan(blockCount);
+  });
+
+  it("all rows within width 80", () => {
+    for (const row of renderSession(outline, rect(80, 24), "neon", false)) {
       expect(displayWidth(row)).toBeLessThanOrEqual(80);
     }
   });

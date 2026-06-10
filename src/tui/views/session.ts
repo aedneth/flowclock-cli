@@ -18,6 +18,7 @@ import { humanDuration } from "../../lib/format.js";
 import { breakRatio } from "../../lib/flowtime.js";
 import {
   renderBigLines,
+  renderSimpleLines,
   renderOutlineLines,
   bigWidth,
   BIG_ROWS,
@@ -44,7 +45,7 @@ export interface SessionViewState {
   breakBudgetS: number | null;
   zen: boolean;                    // hide footer + progress chrome (clock only)
   showControls: boolean;           // show the footer (overridden false by zen)
-  displayStyle: DisplayStyle;      // "block" = solid glyphs · "simple" = minimal outline
+  displayStyle: DisplayStyle;      // "block" solid · "simple" line digits · "outline" hollow
   keybindings: {
     pause: string;
     reset: string;
@@ -179,12 +180,20 @@ export function renderSession(
     counterLines = [line];
   } else {
     const scale = computeSessionScale(innerW, counterAreaRows, time);
-    // "simple" shares block's exact scale/dimensions but renders a minimal
-    // hollow outline instead of solid glyphs. "block" is the default solid look.
+    // All three styles share block's exact scale/dimensions (reserve-first math
+    // is identical); they differ only in glyph rendering:
+    //   "simple"  → clean heavy box-drawing seven-segment digits (line art),
+    //               distinct from block at EVERY scale incl. 1, so toggling is
+    //               visible even in small / tiled windows.
+    //   "outline" → hollow edge-traced block glyphs (coincides with block at
+    //               scale 1; hollows out as it grows).
+    //   "block"   → solid glyphs (default).
     const rawLines =
       displayStyle === "simple"
-        ? renderOutlineLines(time, scale)
-        : renderBigLines(time, scale);
+        ? renderSimpleLines(time, scale)
+        : displayStyle === "outline"
+          ? renderOutlineLines(time, scale)
+          : renderBigLines(time, scale);
     counterLines = rawLines.map((line) => {
       const padded = padTo(line, innerW, "center");
       return color ? `${THEME_FG[theme]}${padded}${RESET}` : padded;
