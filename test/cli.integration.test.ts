@@ -152,4 +152,34 @@ describe("flowclock CLI", () => {
       2,
     );
   });
+
+  // WS5 — dashboard is now the default command
+  it("default command (no subcommand, non-TTY) emits dashboard snapshot", () => {
+    const r = run(["--json"]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout) as { ok: boolean; command: string; data: unknown };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.command).toBe("dashboard");
+  });
+
+  it("--help mentions dashboard", () => {
+    const r = run(["--help"]);
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("dashboard");
+  });
+
+  it("start --bare is an accepted flag (no parse error, still needs TTY/duration)", () => {
+    // Non-TTY + --bare + --json + no --duration → NO_TTY (5), not a parse error (2)
+    const r = run(["start", "--bare", "--json"]);
+    expect(r.status).toBe(5);
+  });
+
+  it("headless start --duration 0 --json still logs a session (not the dashboard)", () => {
+    const r = run(["start", "--duration", "0", "--json"]);
+    expect(r.status).toBe(0);
+    const parsed = JSON.parse(r.stdout) as { ok: boolean; command: string; data: { source: string } };
+    expect(parsed.ok).toBe(true);
+    expect(parsed.command).toBe("start");
+    expect(parsed.data.source).toBe("timed");
+  });
 });

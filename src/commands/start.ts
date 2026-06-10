@@ -2,7 +2,7 @@ import type { CommandContext } from "../lib/context.js";
 import { Timer } from "../lib/timer.js";
 import { renderHud, ANSI } from "../lib/hud.js";
 import { startKeyReader, readGoalOutcome } from "../lib/keys.js";
-import { appendSession } from "../lib/session.js";
+import { appendSession, readSessions } from "../lib/session.js";
 import { sessionsPathFor } from "../lib/config.js";
 import { THEME_FG } from "../lib/theme.js";
 import { jsonSuccess, printJson } from "../lib/output.js";
@@ -11,6 +11,7 @@ import { humanDuration } from "../lib/format.js";
 import { suggestBreakS } from "../lib/flowtime.js";
 import type { Session, SessionSource, BreakCategory } from "../schemas/session.js";
 import { ThemeNameSchema, type ThemeName } from "../schemas/config.js";
+import { runDashboardApp } from "../tui/app.js";
 
 export interface StartOptions {
   duration?: number;
@@ -29,6 +30,35 @@ export interface StartOptions {
   breakBudget?: number;
   /** Minimal HUD: clock only (`--zen`). */
   zen?: boolean;
+  /** Standalone HUD without the dashboard (`--bare`). */
+  bare?: boolean;
+}
+
+/**
+ * Routing predicate: returns true when `flowclock start` should open the
+ * unified dashboard instead of the legacy standalone HUD.
+ *
+ * Conditions that bypass the dashboard (→ headless / legacy HUD):
+ *   - Non-TTY (isTTY=false)
+ *   - JSON mode (json=true)
+ *   - --bare flag
+ *   - --zen flag
+ *   - --no-hud flag
+ *   - --duration set (timed / headless session)
+ */
+export function shouldUseDashboard(
+  opts: { bare?: boolean; zen?: boolean; noHud?: boolean; duration?: number },
+  isTTY: boolean,
+  json: boolean,
+): boolean {
+  return (
+    isTTY &&
+    !json &&
+    !opts.bare &&
+    !opts.zen &&
+    opts.noHud !== true &&
+    opts.duration === undefined
+  );
 }
 
 const TICK_MS = 100; // matches flowtime.sh `sleep 0.1`
@@ -57,6 +87,25 @@ export async function runStart(
         `unknown theme '${opts.theme}' (expected: neon|amber|blue|mono)`,
       );
     }
+  }
+
+  // Route to the unified dashboard when all dashboard conditions are met.
+  // Headless/agent/bare/zen/--duration paths bypass the dashboard entirely.
+  if (shouldUseDashboard(opts, ctx.isTTY, ctx.json)) {
+    const file = sessionsPathFor(ctx.config, ctx.paths);
+    const { sessions } = readSessions(file);
+    await runDashboardApp(ctx, sessions, {
+      initialView: "session",
+      pendingSession: {
+        goal: opts.goal ?? null,
+        label: opts.label ?? null,
+        theme: opts.theme,
+        focusTargetS: opts.target ?? null,
+        breakBudgetS: opts.breakBudget ?? null,
+      },
+    });
+    // The dashboard persists the session on stop; do NOT appendSession here.
+    return;
   }
 
   const headless = opts.noHud === true || !ctx.isTTY;
