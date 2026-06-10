@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   renderBigLines,
+  renderOutlineLines,
   bigWidth,
   computeScale,
   computeSessionScale,
@@ -133,5 +134,42 @@ describe("renderBigFrame", () => {
     });
     expect(frame).toContain("\x1b[32m");
     expect(frame).toContain(ANSI.reset);
+  });
+});
+
+describe("renderOutlineLines (minimal / simple style)", () => {
+  it("matches the solid block's exact dimensions at the same scale", () => {
+    for (const scale of [1, 2, 3]) {
+      const solid = renderBigLines("12:34:56", scale);
+      const outline = renderOutlineLines("12:34:56", scale);
+      expect(outline).toHaveLength(solid.length);
+      outline.forEach((line, i) => {
+        expect(line.length).toBe(solid[i]!.length);
+      });
+    }
+  });
+
+  it("hollows out interiors at scale 3 (fewer block cells than the solid)", () => {
+    const solidCount = renderBigLines("8", 3).join("").split("█").length - 1;
+    const outlineCount = renderOutlineLines("8", 3).join("").split("█").length - 1;
+    expect(outlineCount).toBeLessThan(solidCount);
+    expect(outlineCount).toBeGreaterThan(0); // still a visible glyph
+  });
+
+  it("only ever emits the fill char and spaces", () => {
+    const chars = new Set(renderOutlineLines("00:00", 2).join(""));
+    for (const ch of chars) {
+      expect([" ", "█"]).toContain(ch);
+    }
+  });
+
+  it("honours a custom fill character", () => {
+    const out = renderOutlineLines("0", 2, "▒").join("");
+    expect(out).toContain("▒");
+    expect(out).not.toContain("█");
+  });
+
+  it("never throws on unexpected characters", () => {
+    expect(() => renderOutlineLines("ab", 2)).not.toThrow();
   });
 });

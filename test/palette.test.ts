@@ -363,4 +363,19 @@ describe("renderPalette", () => {
   it("emptyPaletteState returns { open:false, query:'', selected:0 }", () => {
     expect(emptyPaletteState()).toEqual({ open: false, query: "", selected: 0 });
   });
+
+  it("includes a 'display' command to toggle display style", () => {
+    const display = PALETTE_COMMANDS.find((c) => c.name === "display");
+    expect(display).toBeDefined();
+    expect(display!.summary.toLowerCase()).toContain("display style");
+  });
+
+  it("filters to 'display' when searching 'display'", () => {
+    expect(filterCommands("display").some((c) => c.name === "display")).toBe(true);
+  });
+
+  it("the 'start' command advertises the form", () => {
+    const start = PALETTE_COMMANDS.find((c) => c.name === "start");
+    expect(start!.summary.toLowerCase()).toContain("form");
+  });
 });

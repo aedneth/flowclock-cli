@@ -30,6 +30,14 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
   // Spacer
   body.push("");
 
+  // Starting a session
+  body.push(padTo("Start a session (on the Session view, idle):", innerW));
+  body.push(padTo("s / n / Enter open the new-session form (goal · name · target · break budget)", innerW));
+  body.push(padTo("…or from your shell: start --goal \"…\" --target 1h --break-budget 20m", innerW));
+
+  // Spacer
+  body.push("");
+
   // Session controls
   body.push(padTo("Session controls (while a session runs):", innerW));
   body.push(padTo("p pause/resume · b break on/off · 1-6 break category · r reset · q stop & save", innerW));
@@ -40,7 +48,8 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
 
   // Global
   body.push(padTo("Global:", innerW));
-  body.push(padTo("/ command palette · r refresh · q or Esc quit", innerW));
+  body.push(padTo("/ command palette · d display style (block/simple) · t theme · r refresh · q/Esc quit", innerW));
+  body.push(padTo("d and t are saved as your default; both are also in the / palette.", innerW));
 
   // Spacer
   body.push("");

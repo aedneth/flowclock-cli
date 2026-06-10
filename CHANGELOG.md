@@ -6,6 +6,42 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.1.0] - 2026-06-10
+
+A usability follow-up to v3: you can now configure and start everything from
+inside the dashboard, and the minimalist `simple` display style finally gets the
+same scaling the `block` style already had.
+
+### Added
+
+- **In-dashboard new-session form.** On the idle Session view, press `s`, `n`, or
+  `Enter` (or run `start` from the `/` palette) to open a centered form for the
+  session **goal**, **name**, **focus target**, and **break budget** — no need to
+  drop to the shell. `Tab`/`↑↓` move between fields, `Enter` starts, `Esc` cancels.
+  Invalid durations are reported inline instead of starting the session.
+- **Live, persisted display-style toggle.** Press `d` (or run `display` from the
+  palette) to switch the Session counter between `block` (solid) and `simple`
+  (minimal outline). The choice is **saved to your config** as the new default.
+- **Live, persisted theme switch via `t`.** The `t` key cycles the theme and now
+  **persists** it (the palette `theme` command persists too) — previously theme
+  switches were in-memory only.
+- **Scaled `simple` display style.** The minimalist clock now shares the `block`
+  style's exact reserve-first scaling and dimensions, rendered as a large hollow
+  outline instead of a tiny single text line. (`renderOutlineLines` in bigfont.)
+
+### Changed
+
+- The `/` palette `start` command now opens the new-session form instead of
+  immediately starting a blank session.
+- Session-view footer and Help view document the new `d`/`t` toggles and the form.
+
+### Notes
+
+- **Public default is unchanged: `displayStyle` stays `block`** for everyone. The
+  scaled `simple` style is an opt-in alternate you can toggle to and compare.
+- Data schema unchanged (still v3). All headless/agent/`--json`/non-TTY contracts
+  are unchanged. No new dependencies.
+
 ## [3.0.0] - 2026-06-09
 
 flowclock v3 unifies everything into **the interactive dashboard as the default
@@ -178,7 +214,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.0.0...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.1.0...HEAD
+[3.1.0]: https://github.com/aedneth/flowclock-cli/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aedneth/flowclock-cli/compare/v2.0.0...v3.0.0
 [2.0.0]: https://github.com/aedneth/flowclock-cli/compare/v1.0.0...v2.0.0
 [1.0.0]: https://github.com/aedneth/flowclock-cli/compare/v0.1.0...v1.0.0

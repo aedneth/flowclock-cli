@@ -27,6 +27,7 @@ import { renderBreaks } from "../src/tui/views/breaks.js";
 import { buildFrame, compositeOverlay } from "../src/tui/app.js";
 import type { LiveSession } from "../src/tui/app.js";
 import { emptyPaletteState } from "../src/tui/palette.js";
+import { emptySessionFormState } from "../src/tui/sessionform.js";
 
 // Command under test
 import { runDashboard } from "../src/commands/dashboard.js";
@@ -641,6 +642,8 @@ describe("buildFrame (WS5)", () => {
       palette: emptyPaletteState(),
       summary: null,
       theme: "neon" as const,
+      form: emptySessionFormState(),
+      displayStyle: "block" as const,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -670,6 +673,8 @@ describe("buildFrame (WS5)", () => {
       palette: emptyPaletteState(),
       summary: null,
       theme: "neon" as const,
+      form: emptySessionFormState(),
+      displayStyle: "block" as const,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -699,6 +704,8 @@ describe("buildFrame (WS5)", () => {
       palette: emptyPaletteState(),
       summary: null,
       theme: "neon" as const,
+      form: emptySessionFormState(),
+      displayStyle: "block" as const,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     expect(frame).toHaveLength(24);
@@ -716,6 +723,8 @@ describe("buildFrame (WS5)", () => {
       palette: { open: true, query: "", selected: 0 },
       summary: null,
       theme: "neon" as const,
+      form: emptySessionFormState(),
+      displayStyle: "block" as const,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -734,6 +743,8 @@ describe("buildFrame (WS5)", () => {
       palette: emptyPaletteState(),
       summary: null,
       theme: "neon" as const,
+      form: emptySessionFormState(),
+      displayStyle: "block" as const,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -752,6 +763,8 @@ describe("buildFrame (WS5)", () => {
       palette: emptyPaletteState(),
       summary: null,
       theme: "neon" as const,
+      form: emptySessionFormState(),
+      displayStyle: "block" as const,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -770,6 +783,8 @@ describe("buildFrame (WS5)", () => {
       palette: emptyPaletteState(),
       summary: null,
       theme: "neon" as const,
+      form: emptySessionFormState(),
+      displayStyle: "block" as const,
     };
     const frame = buildFrame(state, 80, 30, ctx);
     expect(frame).toHaveLength(30);

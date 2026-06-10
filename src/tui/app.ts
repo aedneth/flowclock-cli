@@ -10,14 +10,14 @@
 
 import type { CommandContext } from "../lib/context.js";
 import type { Session } from "../schemas/session.js";
-import type { ThemeName } from "../schemas/config.js";
+import type { ThemeName, DisplayStyle } from "../schemas/config.js";
 import type { BreakCategory } from "../schemas/session.js";
 import { buildSnapshot } from "../lib/snapshot.js";
 import { readSessions, appendSession } from "../lib/session.js";
-import { sessionsPathFor } from "../lib/config.js";
+import { sessionsPathFor, saveConfig } from "../lib/config.js";
 import { Timer } from "../lib/timer.js";
 import { suggestBreakS } from "../lib/flowtime.js";
-import { humanDuration } from "../lib/format.js";
+import { humanDuration, parseDurationToS } from "../lib/format.js";
 import { Screen } from "../lib/tui/screen.js";
 import { startNavReader } from "../lib/tui/input.js";
 import { splitV } from "../lib/tui/layout.js";
@@ -38,6 +38,13 @@ import {
   renderPalette,
 } from "./palette.js";
 import type { PaletteState } from "./palette.js";
+import {
+  emptySessionFormState,
+  openSessionFormState,
+  sessionFormApplyKey,
+  renderSessionForm,
+} from "./sessionform.js";
+import type { SessionFormState, SessionFormValues } from "./sessionform.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -69,6 +76,9 @@ const BREAK_CATEGORIES: BreakCategory[] = [
 /** All available themes in cycle order. */
 const THEMES: ThemeName[] = ["neon", "amber", "blue", "mono"];
 
+/** Display styles in toggle order. */
+const DISPLAY_STYLES: DisplayStyle[] = ["block", "simple"];
+
 const CTRL_C = "\x03";
 
 // ---------------------------------------------------------------------------
@@ -98,8 +108,10 @@ interface AppState {
   detailOpen: boolean;
   live: LiveSession | null;
   palette: PaletteState;
+  form: SessionFormState;
   summary: SummaryState | null;
   theme: ThemeName;
+  displayStyle: DisplayStyle;
 }
 
 // ---------------------------------------------------------------------------
@@ -266,6 +278,7 @@ export function buildFrame(
               breakBudgetS: live.breakBudgetS,
               zen: false,
               showControls: true,
+              displayStyle: state.displayStyle,
               keybindings: ctx.config.keybindings,
             };
           } else {
@@ -284,6 +297,7 @@ export function buildFrame(
               breakBudgetS: null,
               zen: false,
               showControls: true,
+              displayStyle: state.displayStyle,
               keybindings: ctx.config.keybindings,
             };
           }
@@ -319,6 +333,8 @@ export function buildFrame(
     } else {
       footerHints = "[any key] dismiss";
     }
+  } else if (state.form.open) {
+    footerHints = "[Tab] next field · [Enter] start · [Esc] cancel";
   } else if (state.palette.open) {
     footerHints = "[↑↓] select · [Enter] run · [Esc] cancel";
   } else if (state.live && state.view === "session") {
@@ -329,9 +345,9 @@ export function buildFrame(
       footerHints = `[${kb.pause}] pause · [${kb.break}] break · [1-6] cat · [${kb.reset}] reset · [${kb.quit}] stop & save · [Tab] views`;
     }
   } else if (state.live) {
-    footerHints = `[Tab]/[1-6] views · session ● ${state.live.timer.display()} running · [Ctrl-C] quit`;
+    footerHints = `[Tab]/[1-6] views · session ● ${state.live.timer.display()} running · [d] style · [Ctrl-C] quit`;
   } else {
-    footerHints = "[Tab] view · [↑↓] move · [Enter] detail · [/] commands · [r] refresh · [q] quit";
+    footerHints = "[Tab] views · [s] start · [/] commands · [d] style · [t] theme · [q] quit";
   }
   const footerLine = padTo(footerHints, cols);
   if (footerRect) frame.push(footerLine);
@@ -345,6 +361,12 @@ export function buildFrame(
   if (state.summary) {
     const summaryOverlay = buildSummaryOverlay(state.summary, cols, rows, theme, color);
     return compositeOverlay(baseFrame, summaryOverlay, cols);
+  }
+
+  // New-session form overlay
+  if (state.form.open) {
+    const formOverlay = renderSessionForm(state.form, cols, rows, theme, color);
+    return compositeOverlay(baseFrame, formOverlay, cols);
   }
 
   // Palette overlay
@@ -432,8 +454,10 @@ export async function runDashboardApp(
       detailOpen: false,
       live: null,
       palette: emptyPaletteState(),
+      form: emptySessionFormState(),
       summary: null,
       theme: ctx.config.theme,
+      displayStyle: ctx.config.displayStyle,
     };
 
     // If a pending session is provided, start it immediately
@@ -573,6 +597,74 @@ export async function runDashboardApp(
       }
     }
 
+    /**
+     * Persist the live-switchable preferences (theme + display style) to the
+     * config file so they stick as the user's default. Best-effort: a write
+     * failure must never crash the TUI — the in-memory state still applies.
+     */
+    function persistConfig() {
+      try {
+        ctx.config.theme = state.theme;
+        ctx.config.displayStyle = state.displayStyle;
+        saveConfig(ctx.config, ctx.paths);
+      } catch {
+        // ignore — preference still applied for this session
+      }
+    }
+
+    /** Cycle the theme (live) and persist it. */
+    function cycleTheme() {
+      const idx = THEMES.indexOf(state.theme);
+      state.theme = THEMES[(idx + 1) % THEMES.length]!;
+      persistConfig();
+      render();
+    }
+
+    /** Toggle the display style (block ↔ simple, live) and persist it. */
+    function cycleDisplayStyle() {
+      const idx = DISPLAY_STYLES.indexOf(state.displayStyle);
+      state.displayStyle = DISPLAY_STYLES[(idx + 1) % DISPLAY_STYLES.length]!;
+      persistConfig();
+      render();
+    }
+
+    /** Open the new-session form (only when idle — never over a live session). */
+    function openForm() {
+      if (state.live) return;
+      state.form = openSessionFormState();
+      state.view = "session";
+      render();
+    }
+
+    /**
+     * Start a live session from the form's values. Parses the target/break
+     * durations; on a parse error, surfaces it in the form and stays open.
+     */
+    function startSessionFromForm(values: SessionFormValues) {
+      let focusTargetS: number | null = null;
+      let breakBudgetS: number | null = null;
+      try {
+        if (values.target.trim()) focusTargetS = parseDurationToS(values.target);
+        if (values.break.trim()) breakBudgetS = parseDurationToS(values.break);
+      } catch (err) {
+        state.form = { ...state.form, error: (err as Error).message };
+        render();
+        return;
+      }
+
+      state.live = {
+        timer: new Timer(),
+        goal: values.goal.trim() || null,
+        label: values.label.trim() || null,
+        focusTargetS,
+        breakBudgetS,
+      };
+      state.form = emptySessionFormState();
+      state.view = "session";
+      startTick();
+      render();
+    }
+
     /** Execute a palette command by name, then close the palette. */
     function executePaletteCommand(commandName: string) {
       state.palette = emptyPaletteState();
@@ -588,15 +680,9 @@ export async function runDashboardApp(
           state.detailOpen = false;
           break;
         case "start":
+          // Open the intuitive new-session form (only when idle).
           if (!state.live) {
-            state.live = {
-              timer: new Timer(),
-              goal: null,
-              label: null,
-              focusTargetS: null,
-              breakBudgetS: null,
-            };
-            startTick();
+            state.form = openSessionFormState();
             state.view = "session";
           }
           break;
@@ -612,6 +698,13 @@ export async function runDashboardApp(
         case "theme": {
           const idx = THEMES.indexOf(state.theme);
           state.theme = THEMES[(idx + 1) % THEMES.length]!;
+          persistConfig();
+          break;
+        }
+        case "display": {
+          const idx = DISPLAY_STYLES.indexOf(state.displayStyle);
+          state.displayStyle = DISPLAY_STYLES[(idx + 1) % DISPLAY_STYLES.length]!;
+          persistConfig();
           break;
         }
         case "zen":
@@ -665,6 +758,27 @@ export async function runDashboardApp(
         state.summary = null;
         state.selectedIndex = 0;
         state.scrollTop = 0;
+        render();
+        return;
+      }
+
+      // ── (1b) New-session form: feed keys to its reducer ───────────────────
+      if (state.form.open) {
+        // Ctrl-C aborts the form and exits cleanly (no live session yet).
+        if (key.name === "char" && key.char === CTRL_C) {
+          cleanup();
+          return;
+        }
+        const result = sessionFormApplyKey(state.form, key);
+        state.form = result.state;
+        if (result.action?.type === "cancel") {
+          render();
+          return;
+        }
+        if (result.action?.type === "submit") {
+          startSessionFromForm(result.action.values);
+          return;
+        }
         render();
         return;
       }
@@ -799,17 +913,21 @@ export async function runDashboardApp(
         if (ch === "5") { state.view = "breaks"; state.detailOpen = false; render(); return; }
         if (ch === "6") { state.view = "help"; state.detailOpen = false; render(); return; }
 
-        // Start a new session on session view when idle
-        if ((ch === "s" || ch === "\r") && state.view === "session" && !state.live) {
-          state.live = {
-            timer: new Timer(),
-            goal: null,
-            label: null,
-            focusTargetS: null,
-            breakBudgetS: null,
-          };
-          startTick();
-          render();
+        // Open the new-session form on the session view when idle.
+        if ((ch === "s" || ch === "n" || ch === "\r") && state.view === "session" && !state.live) {
+          openForm();
+          return;
+        }
+
+        // Toggle display style (block ↔ simple) — works anywhere, persisted.
+        if (ch === "d") {
+          cycleDisplayStyle();
+          return;
+        }
+
+        // Cycle theme — works anywhere, persisted.
+        if (ch === "t") {
+          cycleTheme();
           return;
         }
 
@@ -868,16 +986,8 @@ export async function runDashboardApp(
 
       if (key.name === "enter") {
         if (state.view === "session" && !state.live) {
-          // Start a new session on Enter when idle
-          state.live = {
-            timer: new Timer(),
-            goal: null,
-            label: null,
-            focusTargetS: null,
-            breakBudgetS: null,
-          };
-          startTick();
-          render();
+          // Open the new-session form on Enter when idle
+          openForm();
           return;
         }
         if (state.view === "sessions") {
