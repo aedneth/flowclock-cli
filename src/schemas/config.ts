@@ -6,6 +6,10 @@ export const CONFIG_SCHEMA_VERSION = 1;
 export const ThemeNameSchema = z.enum(["neon", "amber", "blue", "mono"]);
 export type ThemeName = z.infer<typeof ThemeNameSchema>;
 
+/** HUD / counter display style: solid block (default) or minimal outline. */
+export const DisplayStyleSchema = z.enum(["simple", "block"]);
+export type DisplayStyle = z.infer<typeof DisplayStyleSchema>;
+
 export const KeybindingsSchema = z.object({
   pause: z.string().length(1).default("p"),
   reset: z.string().length(1).default("r"),
@@ -33,8 +37,8 @@ export const ConfigSchema = z.object({
   apiEndpoint: z.string().url().nullable().default(null),
   /** Optional big ASCII display (v0.3.0). */
   bigFont: z.boolean().default(false),
-  /** HUD display style: "simple" or "block" (default). */
-  displayStyle: z.enum(["simple", "block"]).default("block"),
+  /** HUD display style: "simple" (minimal outline) or "block" (default). */
+  displayStyle: DisplayStyleSchema.default("block"),
   /** Whether to show the key-controls legend in the HUD. */
   showControls: z.boolean().default(true),
   /** Daily focus goal in seconds (default 4 h). */

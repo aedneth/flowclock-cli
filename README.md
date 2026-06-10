@@ -120,10 +120,11 @@ Ratio   1:4.3 focus:rest
 
 ## Display styles & themes
 
-- **`displayStyle`** — `block` (default from v3, the big 7-segment counter in
-  the Session hero view) or `simple` (compact centered clock). `config set
-  displayStyle simple` restores the compact style. Override per session with
-  `start --big`.
+- **`displayStyle`** — `block` (default from v3, the solid 7-segment counter in
+  the Session hero view) or `simple` (a minimal **outline** of the same large
+  counter — it now shares `block`'s reserve-first scaling instead of a tiny text
+  line). Toggle live in the dashboard with **`d`**, or `config set displayStyle
+  simple`. Override the standalone HUD per session with `start --big`.
 
   ```
   ████   █    ████ ████   █  █ ████
@@ -190,6 +191,49 @@ Live session controls inside the dashboard:
 | `r` | Reset the session clock |
 | `q` | Stop & save the session (a summary shows, then the Session view) |
 
+### Starting a session — the in-dashboard form
+
+You no longer need to drop to the shell to start a tailored session. On the idle
+Session view, press **`s`**, **`n`**, or **`Enter`** (or run `start` from the `/`
+palette) to open a centered form:
+
+```
+ ╔══════════════════ New session ══════════════════╗
+ ║ › Goal          Deep work — StreamNet▏           ║
+ ║   Name                                           ║
+ ║   Target        1h                               ║
+ ║   Break budget  20m                              ║
+ ║                                                  ║
+ ║   focus target — e.g. 1h, 90m, 25m (optional)    ║
+ ║                                                  ║
+ ║   [Tab] next · [Enter] start · [Esc] cancel      ║
+ ╚══════════════════════════════════════════════════╝
+```
+
+`Tab` / `↑↓` move between fields, `Enter` starts the session inside the dashboard,
+`Esc` cancels. Durations accept the same forms as the CLI (`1h30m`, `90m`, `25m`,
+`45s`, or bare seconds); an invalid value is reported inline rather than starting
+the session. Every field is optional — an empty form starts a plain session.
+
+The shell entry point still works and behaves identically:
+
+```bash
+flowclock start --goal "Deep work — StreamNet" --target 1h --break-budget 20m
+```
+
+### Display style — `block` vs `simple` (toggle live)
+
+The Session counter has two looks, both using the **same reserve-first scaling**
+so they stay prominent without overshadowing the metadata:
+
+- **`block`** (default) — solid 7-segment glyphs.
+- **`simple`** — a minimal hollow outline of the same large digits.
+
+Press **`d`** (or run `display` from the palette) to toggle between them, and
+**`t`** to cycle the theme. Both choices are **saved to your config** as your new
+default — the same as running `config set displayStyle simple` / `config set
+theme neon`. The public default stays `block`; `simple` is an opt-in alternate.
+
 ### Command palette
 
 Press **`/`** to open a transient, centered command-palette overlay. It is **not
@@ -200,8 +244,10 @@ a permanent bar** — it appears only when invoked and disappears when you press
 
 ```
 [Tab] / [1–6]  switch view     [↑↓] / [j k]  scroll
-[Enter]        detail          [r]            refresh
-[/]            command palette [q] / [Esc]    quit / close overlay
+[s] / [n]      new session     [Enter]        detail / start
+[d]            display style   [t]            theme (both saved)
+[/]            command palette [r]            refresh
+[q] / [Esc]    quit / close overlay
 ```
 
 The dashboard restores your terminal cleanly on exit — no artifacts.
@@ -307,7 +353,7 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `theme` | `neon` | `neon` · `amber` · `blue` · `mono` |
-| `displayStyle` | `block` | `block` 7-segment (default from v3) or `simple` compact clock |
+| `displayStyle` | `block` | `block` solid 7-segment (default) or `simple` minimal outline (same scaling); toggle live with `d` |
 | `showControls` | `true` | show the controls footer (`--zen` overrides) |
 | `dailyFocusGoalS` | `14400` | daily focus goal in seconds (drives maximization %) |
 | `keybindings.{pause,break,category,reset,quit}` | `p` `b` `c` `r` `q` | in-session keys |
@@ -334,7 +380,8 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v1.0.0** ✅ | Goals mode, daily streaks, theme override + `--big`, weekly export, shell completions, schema v2 |
 | **v2.0.0** ✅ | Flowtime break model (categories), targets + break budgets, proportional breaks, gamification (flow score/achievements), interactive TUI dashboard, visible controls + `--zen`, schema v3 |
 | **v3.0.0** ✅ | Dashboard as default command; Session hero view (big balanced counter, live controls); Help view; `/` command palette; `start --bare`; `dashboard --view`; live theme switching; reserve-first counter scaling |
-| **v3.1.0** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
+| **v3.1.0** ✅ | In-dashboard new-session form (goal/name/target/break); live + persisted display-style (`d`) and theme (`t`) toggles; scaled minimal `simple` style (shares `block`'s scaling) |
+| **v3.2.0** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 
 ## Contributing

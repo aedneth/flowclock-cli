@@ -18,10 +18,12 @@ import { humanDuration } from "../../lib/format.js";
 import { breakRatio } from "../../lib/flowtime.js";
 import {
   renderBigLines,
+  renderOutlineLines,
   bigWidth,
   BIG_ROWS,
   computeSessionScale,
 } from "../../lib/bigfont.js";
+import type { DisplayStyle } from "../../schemas/config.js";
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -42,6 +44,7 @@ export interface SessionViewState {
   breakBudgetS: number | null;
   zen: boolean;                    // hide footer + progress chrome (clock only)
   showControls: boolean;           // show the footer (overridden false by zen)
+  displayStyle: DisplayStyle;      // "block" = solid glyphs · "simple" = minimal outline
   keybindings: {
     pause: string;
     reset: string;
@@ -96,7 +99,7 @@ export function renderSession(
   // ── ACTIVE ───────────────────────────────────────────────────────────────
   const { goal, label, focusS, totalBreakS, focusTargetS, breakBudgetS,
           onBreak, currentBreakS, breakCategory, suggestedBreakS,
-          zen, showControls, keybindings: kb, time } = state;
+          zen, showControls, displayStyle, keybindings: kb, time } = state;
 
   // -- Top lines (goal/label) -----------------------------------------------
   const topLines: string[] = [];
@@ -176,7 +179,13 @@ export function renderSession(
     counterLines = [line];
   } else {
     const scale = computeSessionScale(innerW, counterAreaRows, time);
-    counterLines = renderBigLines(time, scale).map((line) => {
+    // "simple" shares block's exact scale/dimensions but renders a minimal
+    // hollow outline instead of solid glyphs. "block" is the default solid look.
+    const rawLines =
+      displayStyle === "simple"
+        ? renderOutlineLines(time, scale)
+        : renderBigLines(time, scale);
+    counterLines = rawLines.map((line) => {
       const padded = padTo(line, innerW, "center");
       return color ? `${THEME_FG[theme]}${padded}${RESET}` : padded;
     });

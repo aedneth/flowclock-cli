@@ -68,6 +68,43 @@ export function bigWidth(time: string, scale = 1): number {
 }
 
 /**
+ * Render a clock string as a MINIMAL / OUTLINE block — the "simple" display
+ * style. It shares the exact geometry, scaling and dimensions of the solid
+ * `renderBigLines` (so the reserve-first layout maths are identical), but only
+ * the EDGE cells of each glyph are drawn: interiors are hollow. The result is a
+ * large, airy, line-art clock instead of heavy solid blocks.
+ *
+ * Implementation: render the solid block at the same scale, then keep a filled
+ * cell only when at least one of its 4-neighbours is empty (or off the grid).
+ * Because it's derived from the solid render, it scales cleanly at any size and
+ * stays perfectly aligned with the block style.
+ *
+ * @param fill character used for the outline strokes (default "█").
+ */
+export function renderOutlineLines(
+  time: string,
+  scale = 1,
+  fill = "█",
+): string[] {
+  const solid = renderBigLines(time, scale);
+  const grid = solid.map((line) => [...line]);
+  const filled = (r: number, c: number): boolean =>
+    r >= 0 && r < grid.length && c >= 0 && c < (grid[r]?.length ?? 0) && grid[r]![c] === "█";
+
+  return grid.map((cells, r) =>
+    cells
+      .map((ch, c) => {
+        if (ch !== "█") return " ";
+        // Interior cell: all four neighbours filled → hollow it out.
+        const isEdge =
+          !filled(r - 1, c) || !filled(r + 1, c) || !filled(r, c - 1) || !filled(r, c + 1);
+        return isEdge ? fill : " ";
+      })
+      .join(""),
+  );
+}
+
+/**
  * Largest integer scale (>=1) that fits `time` in an area the CALLER has
  * already reserved (i.e. metadata/footer space is subtracted before calling).
  * Targets ~92% of the area so the counter is prominent but keeps a little air.

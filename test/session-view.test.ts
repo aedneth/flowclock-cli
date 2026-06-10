@@ -38,6 +38,7 @@ function activeState(overrides: Partial<SessionViewState> = {}): SessionViewStat
     breakBudgetS: 1200,    // 20 min budget
     zen: false,
     showControls: true,
+    displayStyle: "block",
     keybindings: DEFAULT_KB,
     ...overrides,
   };
@@ -303,5 +304,43 @@ describe("renderSession — goal met state", () => {
   it("contains ✦ prefix when goal is met", () => {
     const rows = renderSession(metState, rect(80, 24), "neon", false);
     expect(rows.join("\n")).toContain("✦");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// displayStyle: "simple" (minimal outline) shares block's scaling/metadata
+// ---------------------------------------------------------------------------
+
+describe("renderSession — simple display style", () => {
+  const simple = activeState({ displayStyle: "simple" });
+  const block = activeState({ displayStyle: "block" });
+
+  it("returns exactly rect.height rows like block", () => {
+    expect(renderSession(simple, rect(80, 24), "neon", false)).toHaveLength(24);
+  });
+
+  it("keeps metadata (goal/focus/footer) alongside the big counter", () => {
+    const joined = renderSession(simple, rect(80, 24), "neon", false).join("\n");
+    expect(joined).toContain("Deep work");
+    expect(joined).toContain("focus");
+    expect(joined).toContain("pause");
+  });
+
+  it("still renders a big block-font counter (uses █ strokes, not a tiny text line)", () => {
+    const joined = renderSession(simple, rect(80, 24), "neon", false).join("\n");
+    expect(joined).toContain("█");
+  });
+
+  it("is hollower than block: fewer █ cells at the same size", () => {
+    const simpleCount = renderSession(simple, rect(80, 24), "neon", false).join("").split("█").length - 1;
+    const blockCount = renderSession(block, rect(80, 24), "neon", false).join("").split("█").length - 1;
+    expect(simpleCount).toBeLessThan(blockCount);
+    expect(simpleCount).toBeGreaterThan(0);
+  });
+
+  it("all rows within width 80", () => {
+    for (const row of renderSession(simple, rect(80, 24), "neon", false)) {
+      expect(displayWidth(row)).toBeLessThanOrEqual(80);
+    }
   });
 });

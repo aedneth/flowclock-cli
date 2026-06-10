@@ -27,7 +27,7 @@ export interface PaletteCommand {
  */
 export const PALETTE_COMMANDS: PaletteCommand[] = [
   { name: "session",  summary: "go to the live session view" },
-  { name: "start",    summary: "start a focus session" },
+  { name: "start",    summary: "new session — opens the goal/target/break form" },
   { name: "overview", summary: "today's flow overview" },
   { name: "sessions", summary: "browse logged sessions" },
   { name: "goals",    summary: "goals with hit/miss" },
@@ -35,7 +35,8 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   { name: "stats",    summary: "stats + flow score" },
   { name: "history",  summary: "session history" },
   { name: "summary",  summary: "weekly markdown summary" },
-  { name: "theme",    summary: "switch theme (neon|amber|blue|mono)" },
+  { name: "theme",    summary: "switch theme (neon|amber|blue|mono), saved" },
+  { name: "display",  summary: "toggle display style (block|simple), saved" },
   { name: "zen",      summary: "toggle zen (clock only)" },
   { name: "help",     summary: "keybindings & help" },
   { name: "config",   summary: "show configuration" },
