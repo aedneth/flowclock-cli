@@ -77,7 +77,7 @@ const BREAK_CATEGORIES: BreakCategory[] = [
 const THEMES: ThemeName[] = ["neon", "amber", "blue", "mono"];
 
 /** Display styles in toggle order. */
-const DISPLAY_STYLES: DisplayStyle[] = ["block", "simple"];
+const DISPLAY_STYLES: DisplayStyle[] = ["block", "simple", "outline"];
 
 const CTRL_C = "\x03";
 
@@ -620,7 +620,7 @@ export async function runDashboardApp(
       render();
     }
 
-    /** Toggle the display style (block ↔ simple, live) and persist it. */
+    /** Cycle the display style (block → simple → outline, live) and persist it. */
     function cycleDisplayStyle() {
       const idx = DISPLAY_STYLES.indexOf(state.displayStyle);
       state.displayStyle = DISPLAY_STYLES[(idx + 1) % DISPLAY_STYLES.length]!;
@@ -919,7 +919,7 @@ export async function runDashboardApp(
           return;
         }
 
-        // Toggle display style (block ↔ simple) — works anywhere, persisted.
+        // Cycle display style (block → simple → outline) — anywhere, persisted.
         if (ch === "d") {
           cycleDisplayStyle();
           return;

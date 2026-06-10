@@ -48,7 +48,7 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
 
   // Global
   body.push(padTo("Global:", innerW));
-  body.push(padTo("/ command palette · d display style (block/simple) · t theme · r refresh · q/Esc quit", innerW));
+  body.push(padTo("/ command palette · d display style (block/simple/outline) · t theme · r refresh · q/Esc quit", innerW));
   body.push(padTo("d and t are saved as your default; both are also in the / palette.", innerW));
 
   // Spacer

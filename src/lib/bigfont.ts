@@ -68,16 +68,154 @@ export function bigWidth(time: string, scale = 1): number {
 }
 
 /**
- * Render a clock string as a MINIMAL / OUTLINE block — the "simple" display
+ * Seven-segment membership per glyph, indexed [a, b, c, d, e, f, g]:
+ *
+ *      a            a = top          d = bottom
+ *    f   b          b = upper-right  e = lower-left
+ *      g            c = lower-right  f = upper-left
+ *    e   c          g = middle
+ *      d
+ */
+const SEVEN_SEG: Record<string, string> = {
+  //   abcdefg
+  "0": "1111110",
+  "1": "0110000",
+  "2": "1101101",
+  "3": "1111001",
+  "4": "0110011",
+  "5": "1011011",
+  "6": "1011111",
+  "7": "1110000",
+  "8": "1111111",
+  "9": "1111011",
+};
+
+/**
+ * Pick the heavy box-drawing character for a junction, given which of the four
+ * directions have a stroke emanating from this cell. Lone stubs continue the
+ * stroke (┃/━) rather than using half-caps, so digit edges read as clean,
+ * continuous lines.
+ */
+function boxChar(up: boolean, down: boolean, left: boolean, right: boolean): string {
+  const key = (up ? 8 : 0) | (down ? 4 : 0) | (left ? 2 : 0) | (right ? 1 : 0);
+  switch (key) {
+    case 0b1100: return "┃"; // up + down
+    case 0b0011: return "━"; // left + right
+    case 0b0101: return "┏"; // down + right
+    case 0b0110: return "┓"; // down + left
+    case 0b1001: return "┗"; // up + right
+    case 0b1010: return "┛"; // up + left
+    case 0b1101: return "┣"; // up + down + right
+    case 0b1110: return "┫"; // up + down + left
+    case 0b0111: return "┳"; // down + left + right
+    case 0b1011: return "┻"; // up + left + right
+    case 0b1111: return "╋"; // all four
+    case 0b1000: // lone up   → continue vertical
+    case 0b0100: return "┃";  // lone down
+    case 0b0010: // lone left → continue horizontal
+    case 0b0001: return "━";  // lone right
+    default: return " ";
+  }
+}
+
+/** Render one seven-segment digit as a scale-sized grid of box-drawing rows. */
+function digitGrid(seg: string, scale: number): string[] {
+  const W = 4 * scale;
+  const H = BIG_ROWS * scale;
+  const mid = Math.floor(H / 2);
+  const a = seg[0] === "1", b = seg[1] === "1", c = seg[2] === "1", d = seg[3] === "1";
+  const e = seg[4] === "1", f = seg[5] === "1", g = seg[6] === "1";
+
+  const grid: string[][] = Array.from({ length: H }, () =>
+    Array.from({ length: W }, () => " "),
+  );
+
+  // Horizontal strokes (interior columns only; corners handled below).
+  for (let x = 1; x < W - 1; x++) {
+    if (a) grid[0]![x] = "━";
+    if (g) grid[mid]![x] = "━";
+    if (d) grid[H - 1]![x] = "━";
+  }
+  // Vertical strokes (interior rows only).
+  for (let y = 1; y < mid; y++) {
+    if (f) grid[y]![0] = "┃";
+    if (b) grid[y]![W - 1] = "┃";
+  }
+  for (let y = mid + 1; y < H - 1; y++) {
+    if (e) grid[y]![0] = "┃";
+    if (c) grid[y]![W - 1] = "┃";
+  }
+  // Six corner / junction cells.
+  grid[0]![0]       = boxChar(false, f, false, a);
+  grid[0]![W - 1]   = boxChar(false, b, a, false);
+  grid[mid]![0]     = boxChar(f, e, false, g);
+  grid[mid]![W - 1] = boxChar(b, c, g, false);
+  grid[H - 1]![0]   = boxChar(e, false, false, d);
+  grid[H - 1]![W - 1] = boxChar(c, false, d, false);
+
+  return grid.map((row) => row.join(""));
+}
+
+/** Render a colon (two dots) at `scale`, matching the block colon's width. */
+function colonGrid(scale: number): string[] {
+  const W = scale; // 1 * scale, identical to the block colon's width
+  const H = BIG_ROWS * scale;
+  const cx = Math.floor((W - 1) / 2);
+  const upper = Math.floor(H * 0.3);
+  const lower = Math.floor(H * 0.7);
+  return Array.from({ length: H }, (_, r) =>
+    Array.from({ length: W }, (_, x) => (x === cx && (r === upper || r === lower) ? "●" : " ")).join(""),
+  );
+}
+
+/**
+ * Render a clock string as a MINIMAL heavy-line clock — the "simple" display
+ * style. Each digit is drawn as a clean seven-segment glyph in heavy
+ * box-drawing characters (┏━┓ ┃ ┣━┫ ┗━┛) instead of solid blocks.
+ *
+ * It shares the EXACT width/height geometry of the solid `renderBigLines`
+ * (digit = 4·scale wide, colon = 1·scale wide, gap = scale, height =
+ * BIG_ROWS·scale), so the reserve-first scaling maths and small-panel fallback
+ * thresholds are byte-for-byte identical to the block style. Unlike the old
+ * edge-traced outline, it reads as distinctly different from `block` at every
+ * scale — including scale 1 — so toggling styles is always visible.
+ */
+export function renderSimpleLines(time: string, scale = 1): string[] {
+  const H = BIG_ROWS * scale;
+  const rows: string[] = Array.from({ length: H }, () => "");
+  const chars = [...time];
+  const gap = " ".repeat(scale);
+
+  chars.forEach((chr, idx) => {
+    let glyph: string[];
+    if (chr === ":") {
+      glyph = colonGrid(scale);
+    } else if (SEVEN_SEG[chr]) {
+      glyph = digitGrid(SEVEN_SEG[chr]!, scale);
+    } else {
+      // Unknown char → blank column matching the block font's blank width.
+      glyph = Array.from({ length: H }, () => " ".repeat(scale));
+    }
+    const sep = idx < chars.length - 1 ? gap : "";
+    for (let r = 0; r < H; r++) rows[r] += (glyph[r] ?? "") + sep;
+  });
+
+  return rows;
+}
+
+/**
+ * Render a clock string as a HOLLOW / OUTLINE block — the "outline" display
  * style. It shares the exact geometry, scaling and dimensions of the solid
  * `renderBigLines` (so the reserve-first layout maths are identical), but only
- * the EDGE cells of each glyph are drawn: interiors are hollow. The result is a
- * large, airy, line-art clock instead of heavy solid blocks.
+ * the EDGE cells of each glyph are drawn: interiors are hollowed out. The
+ * result is an airy, edge-traced clock — distinct from both the solid `block`
+ * and the line-art `simple` styles.
  *
  * Implementation: render the solid block at the same scale, then keep a filled
  * cell only when at least one of its 4-neighbours is empty (or off the grid).
  * Because it's derived from the solid render, it scales cleanly at any size and
- * stays perfectly aligned with the block style.
+ * stays perfectly aligned with the block style. Note: at scale 1 the glyphs are
+ * too thin to have interiors, so the outline coincides with the solid block.
  *
  * @param fill character used for the outline strokes (default "█").
  */

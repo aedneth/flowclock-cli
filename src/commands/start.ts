@@ -155,8 +155,13 @@ function runHud(ctx: CommandContext, opts: StartOptions): Promise<Session> {
     const source: SessionSource = opts.duration ? "timed" : "hud";
     const theme: ThemeName = (opts.theme as ThemeName) ?? ctx.config.theme;
     const colorOn = ctx.color ? THEME_FG[theme] : undefined;
-    const style =
-      opts.big ?? ctx.config.bigFont ? "block" : ctx.config.displayStyle;
+    // The standalone (--bare/--zen) HUD only renders the big solid block or a
+    // compact single line. The scaled "simple"/"outline" line fonts are a
+    // dashboard feature, so anything that isn't "block" collapses to the
+    // compact line here (keeps the small-terminal/zen HUD behaviour intact).
+    const big = opts.big ?? ctx.config.bigFont;
+    const style: "block" | "simple" =
+      big || ctx.config.displayStyle === "block" ? "block" : "simple";
     const zen = !!opts.zen;
     const showControls = zen ? false : ctx.config.showControls;
 
