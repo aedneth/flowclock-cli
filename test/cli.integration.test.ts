@@ -182,4 +182,11 @@ describe("flowclock CLI", () => {
     expect(parsed.command).toBe("start");
     expect(parsed.data.source).toBe("timed");
   });
+
+  it("dashboard --view <invalid> exits USAGE (2), never enters the TUI", () => {
+    // Validated before the alt-screen, so a typo can't crash/corrupt the terminal.
+    const r = run(["dashboard", "--view", "bogus"]);
+    expect(r.status).toBe(2);
+    expect(r.stderr).toContain("unknown view");
+  });
 });

@@ -188,7 +188,7 @@ Live session controls inside the dashboard:
 | `b` | Start / end a break |
 | `1`–`6` | Pick break category (rest · meal · exercise · walk · distraction · other) |
 | `r` | Reset the session clock |
-| `q` | Stop & save the session, return to Overview |
+| `q` | Stop & save the session (a summary shows, then the Session view) |
 
 ### Command palette
 

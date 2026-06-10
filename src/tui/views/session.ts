@@ -216,7 +216,7 @@ function buildIdleBody(innerW: number, innerH: number): string[] {
     padTo("No active session", innerW, "center"),
     padTo("", innerW),
     padTo("Press [s] or Enter to start", innerW, "center"),
-    padTo("Type /start for goal · target · break-budget", innerW, "center"),
+    padTo("or [/] for commands · start --goal --target --break-budget from your shell", innerW, "center"),
   ];
 
   const body: string[] = [];

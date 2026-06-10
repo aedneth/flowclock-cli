@@ -10,8 +10,9 @@ import { readSessions } from "../lib/session.js";
 import { sessionsPathFor } from "../lib/config.js";
 import { buildSnapshot } from "../lib/snapshot.js";
 import { jsonSuccess, printJson } from "../lib/output.js";
-import { runDashboardApp } from "../tui/app.js";
+import { runDashboardApp, VIEWS } from "../tui/app.js";
 import type { ViewName } from "../tui/app.js";
+import { ExitCode, fail } from "../lib/exit.js";
 
 export interface DashboardOptions {
   view?: string;
@@ -28,6 +29,15 @@ export async function runDashboard(
   ctx: CommandContext,
   opts: DashboardOptions = {},
 ): Promise<void> {
+  // Validate --view early (before any alt-screen) so a typo fails with a clear
+  // USAGE error instead of crashing the TUI mid-render.
+  if (opts.view !== undefined && !VIEWS.includes(opts.view as ViewName)) {
+    fail(
+      ExitCode.USAGE,
+      `unknown view '${opts.view}' (expected: ${VIEWS.join("|")})`,
+    );
+  }
+
   const file = sessionsPathFor(ctx.config, ctx.paths);
   const { sessions } = readSessions(file);
 

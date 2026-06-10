@@ -45,7 +45,7 @@ import type { PaletteState } from "./palette.js";
 
 export type ViewName = "session" | "overview" | "sessions" | "goals" | "breaks" | "help";
 
-const VIEWS: ViewName[] = ["session", "overview", "sessions", "goals", "breaks", "help"];
+export const VIEWS: ViewName[] = ["session", "overview", "sessions", "goals", "breaks", "help"];
 
 const VIEW_LABELS: Record<ViewName, string> = {
   session: "1:Session",
@@ -233,7 +233,9 @@ export function buildFrame(
       detailOpen: state.detailOpen,
     };
 
-    let bodyRows: string[];
+    // Defensive init: an unexpected view never leaves bodyRows unassigned
+    // (which would throw on the spread below and corrupt the alt-screen).
+    let bodyRows: string[] = [];
 
     if (state.detailOpen && state.view === "sessions") {
       const session = snap.recent[state.selectedIndex];
@@ -551,6 +553,11 @@ export async function runDashboardApp(
         });
         appendSession(file, record);
       }
+      // A stopped-but-not-yet-dismissed session lives in the summary modal —
+      // persist it too so an external signal never drops it.
+      if (state.summary) {
+        appendSession(file, state.summary.record);
+      }
       cleanup();
     }
 
@@ -644,6 +651,12 @@ export async function runDashboardApp(
             if (ch === "y") state.summary.record = { ...state.summary.record, goalMet: true };
             else if (ch === "n") state.summary.record = { ...state.summary.record, goalMet: false };
           }
+          if (ch === CTRL_C) {
+            // Ctrl-C while the summary is up: persist, then exit cleanly.
+            appendSession(file, state.summary.record);
+            cleanup();
+            return;
+          }
         }
         // Persist and dismiss
         appendSession(file, state.summary.record);
@@ -673,13 +686,7 @@ export async function runDashboardApp(
         return;
       }
 
-      // ── (3) Open palette on "/" ───────────────────────────────────────────
-      if (key.name === "char" && key.char === "/" && !state.live) {
-        state.palette = { open: true, query: "", selected: 0 };
-        render();
-        return;
-      }
-      // Allow "/" even with live session (no session-key conflict for "/")
+      // ── (3) Open palette on "/" (works idle or during a live session) ─────
       if (key.name === "char" && key.char === "/") {
         state.palette = { open: true, query: "", selected: 0 };
         render();
