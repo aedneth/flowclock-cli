@@ -20,8 +20,6 @@ import type { Rect } from "../src/lib/tui/layout.js";
 // Shared fixture helpers
 // ---------------------------------------------------------------------------
 
-const DEFAULT_KB = { pause: "p", reset: "r", quit: "q", break: "b", category: "c" };
-
 function activeState(overrides: Partial<SessionViewState> = {}): SessionViewState {
   return {
     active: true,
@@ -37,9 +35,7 @@ function activeState(overrides: Partial<SessionViewState> = {}): SessionViewStat
     focusTargetS: 3600,    // 1 hour
     breakBudgetS: 1200,    // 20 min budget
     zen: false,
-    showControls: true,
     displayStyle: "block",
-    keybindings: DEFAULT_KB,
     ...overrides,
   };
 }
@@ -85,17 +81,16 @@ describe("renderSession — ACTIVE 80×24", () => {
     expect(joined).toContain("break");
   });
 
-  it("contains 'pause' in the footer — footer survived alongside big counter (anti-overshadow guarantee)", () => {
-    // This is the PRIMARY assertion proving the counter does NOT overshadow
-    // the footer. If computeSessionScale reserved space correctly, the footer
-    // controls will still be present in the output even with the big counter.
+  it("keeps metadata but renders NO controls footer (deduped to the global footer)", () => {
+    // The panel used to duplicate the control hints; they now live ONLY in the
+    // dashboard's global footer (app.ts). The reserve-first guarantee is proven
+    // by the metadata (goal + focus/break) surviving alongside the big counter,
+    // while the control words are absent from the panel itself.
     const joined = rows.join("\n");
-    expect(joined).toContain("pause");
-  });
-
-  it("contains 'stop' in the footer — quit binding visible", () => {
-    const joined = rows.join("\n");
-    expect(joined).toContain("stop");
+    expect(joined).toContain("Deep work");
+    expect(joined).toContain("focus");
+    expect(joined).not.toContain("pause");
+    expect(joined).not.toContain("reset");
   });
 });
 
@@ -250,9 +245,10 @@ describe("renderSession — onBreak state", () => {
     expect(rows.join("\n")).toContain("on break");
   });
 
-  it("contains the resume keybinding", () => {
-    const rows = renderSession(breakState, rect(80, 24), "neon", false);
-    expect(rows.join("\n")).toContain("resume");
+  it("shows the on-break status but no controls footer (controls in global footer)", () => {
+    const joined = renderSession(breakState, rect(80, 24), "neon", false).join("\n");
+    expect(joined).toContain("on break");
+    expect(joined).not.toContain("resume");
   });
 
   it("all rows within width 80", () => {
@@ -318,11 +314,10 @@ describe("renderSession — simple display style", () => {
     expect(renderSession(simple, rect(80, 24), "neon", false)).toHaveLength(24);
   });
 
-  it("keeps metadata (goal/focus/footer) alongside the big counter", () => {
+  it("keeps centered metadata (goal/focus) alongside the big counter", () => {
     const joined = renderSession(simple, rect(80, 24), "neon", false).join("\n");
     expect(joined).toContain("Deep work");
     expect(joined).toContain("focus");
-    expect(joined).toContain("pause");
   });
 
   it("renders a big line-art counter (box-drawing strokes, not a tiny text line)", () => {
@@ -359,14 +354,15 @@ describe("renderSession — outline display style", () => {
     expect(rows).toHaveLength(24);
     const joined = rows.join("\n");
     expect(joined).toContain("Deep work");
-    expect(joined).toContain("pause");
+    expect(joined).toContain("focus");
   });
 
-  it("hollows out the block: fewer █ cells than solid block at the same size", () => {
-    const outlineCount = renderSession(outline, rect(80, 24), "neon", false).join("").split("█").length - 1;
-    const blockCount = renderSession(block, rect(80, 24), "neon", false).join("").split("█").length - 1;
-    expect(outlineCount).toBeGreaterThan(0);
-    expect(outlineCount).toBeLessThan(blockCount);
+  it("renders a hollow line-art counter, distinct from the solid block", () => {
+    const outlineRows = renderSession(outline, rect(80, 24), "neon", false).join("\n");
+    const blockRows = renderSession(block, rect(80, 24), "neon", false).join("\n");
+    // The counter glyphs differ (outline emits box-drawing strokes, not █),
+    // so the whole frame is no longer identical to the block style.
+    expect(outlineRows).not.toBe(blockRows);
   });
 
   it("all rows within width 80", () => {
@@ -374,4 +370,75 @@ describe("renderSession — outline display style", () => {
       expect(displayWidth(row)).toBeLessThanOrEqual(80);
     }
   });
+});
+
+// ---------------------------------------------------------------------------
+// Centered layout + zen (v3.3.0)
+// ---------------------------------------------------------------------------
+
+/** Strip ANSI so we can inspect raw text + leading whitespace. */
+function strip(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+describe("renderSession — centered goal + metadata", () => {
+  // Rows include the 1-col panel border, so we measure the TEXT position:
+  // centered text has substantial blank space on BOTH sides.
+  it("centers the goal line", () => {
+    const rows = renderSession(activeState(), rect(80, 24), "neon", false).map(strip);
+    const goalRow = rows.find((r) => r.includes("Deep work"))!;
+    const idx = goalRow.indexOf("Deep work");
+    const after = goalRow.length - (idx + "Deep work".length);
+    expect(idx).toBeGreaterThan(5);
+    expect(after).toBeGreaterThan(5);
+  });
+
+  it("centers the focus progress line", () => {
+    const rows = renderSession(activeState(), rect(80, 24), "neon", false).map(strip);
+    const focusRow = rows.find((r) => r.includes("focus "))!;
+    const idx = focusRow.indexOf("focus ");
+    const after = focusRow.length - (idx + "focus ".length);
+    expect(idx).toBeGreaterThan(2);
+    expect(after).toBeGreaterThan(2);
+  });
+});
+
+describe("renderSession — zen mode (z) hides goal + metadata", () => {
+  it("hides the goal in zen mode", () => {
+    const joined = renderSession(activeState({ zen: true }), rect(80, 24), "neon", false).join("\n");
+    expect(joined).not.toContain("Deep work");
+  });
+
+  it("hides the focus/break metadata in zen mode", () => {
+    const joined = renderSession(activeState({ zen: true }), rect(80, 24), "neon", false).join("\n");
+    expect(joined).not.toContain("focus ");
+    expect(joined).not.toContain("ratio");
+  });
+
+  it("still returns exactly rect.height rows and shows the counter", () => {
+    const rows = renderSession(activeState({ zen: true }), rect(80, 24), "neon", false);
+    expect(rows).toHaveLength(24);
+    // the big counter still draws (block glyphs present)
+    expect(rows.join("")).toContain("█");
+  });
+});
+
+describe("renderSession — classic & bold display styles", () => {
+  for (const style of ["classic", "bold"] as const) {
+    it(`${style}: exact height, keeps metadata, within width`, () => {
+      const rows = renderSession(activeState({ displayStyle: style }), rect(100, 30), "neon", false);
+      expect(rows).toHaveLength(30);
+      const joined = rows.join("\n");
+      expect(joined).toContain("Deep work");
+      expect(joined).toContain("focus");
+      for (const row of rows) expect(displayWidth(row)).toBeLessThanOrEqual(100);
+    });
+
+    it(`${style}: counter differs from block`, () => {
+      const s = renderSession(activeState({ displayStyle: style }), rect(100, 30), "neon", false).join("\n");
+      const b = renderSession(activeState({ displayStyle: "block" }), rect(100, 30), "neon", false).join("\n");
+      expect(s).not.toBe(b);
+    });
+  }
 });

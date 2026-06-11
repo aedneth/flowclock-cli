@@ -78,6 +78,18 @@ export function appendSession(file: string, session: Session): Session {
   return validated;
 }
 
+/**
+ * Delete the session with the given id and persist atomically. Returns the
+ * remaining sessions. A no-op (still rewrites identically) when the id is not
+ * found, so callers can treat it as idempotent.
+ */
+export function deleteSession(file: string, id: string): Session[] {
+  const { sessions } = readSessions(file);
+  const remaining = sessions.filter((s) => s.id !== id);
+  writeFileAtomic(file, JSON.stringify(remaining, null, 2) + "\n");
+  return remaining;
+}
+
 /** Filter/limit options shared by stats and history. */
 export interface QueryOptions {
   since?: Date;

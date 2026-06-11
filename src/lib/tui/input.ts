@@ -21,6 +21,7 @@ export type Key =
   | { name: "tab" }
   | { name: "escape" }
   | { name: "backspace" }
+  | { name: "delete" }
   | { name: "home" }
   | { name: "end" }
   | { name: "char"; char: string };
@@ -47,6 +48,8 @@ const SEQUENCES: Record<string, Key> = {
   "\x1b[4~": { name: "end" },
   "\x1b[7~": { name: "home" },
   "\x1b[8~": { name: "end" },
+  // Delete / "Supr" (forward delete)
+  "\x1b[3~": { name: "delete" },
 };
 
 const CTRL_C = "";

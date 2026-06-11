@@ -120,23 +120,34 @@ Ratio   1:4.3 focus:rest
 
 ## Display styles & themes
 
-- **`displayStyle`** — three looks for the big counter in the Session hero view,
-  all sharing the same reserve-first scaling and dimensions. Cycle live in the
-  dashboard with **`d`** (or `config set displayStyle …`):
+- **`displayStyle`** — five looks for the big counter in the Session hero view,
+  all sharing the same reserve-first scaling. Cycle live in the dashboard with
+  **`d`** (or `config set displayStyle …`):
   - **`block`** (default) — solid 7-segment glyphs.
   - **`simple`** — clean heavy **line** digits in box-drawing strokes (`┏━┓ ┃
-    ┣━┫ ┗━┛`). Minimal and airy, but full hero size — distinct from `block` at
-    every scale, so the toggle is visible even on small / tiled windows.
-  - **`outline`** — a hollow, edge-traced version of the solid block.
+    ┣━┫ ┗━┛`). Minimal and airy, but full hero size.
+  - **`outline`** — a hollow, box-drawing **line-art** clock. Reads as a distinct
+    hollow glyph at **every** size — small, tiled, or maximised.
+  - **`classic`** — tall, solid, **terminal-style numerals** that recreate a
+    familiar monospace clock (light weight).
+  - **`bold`** — the `classic` letterforms with heavier strokes.
 
-  Override the standalone HUD per session with `start --big`.
+  The goal sits **centered** above the counter and the focus/break metadata
+  centered below it. Override the standalone HUD per session with `start --big`.
 
   ```
   block            simple           outline
-  ████  ████       ┏━━┓ ┏━━┓        ████  ████
-  █  █  █  █       ┃  ┃ ┃  ┃        █  █  █  █
-  █  █  █  █       ┃  ┃ ┃  ┃        █  █  █  █
-  ████  ████       ┗━━┛ ┗━━┛        ████  ████
+  ████  ████       ┏━━┓ ┏━━┓        ┌──┐ ┌──┐
+  █  █  █  █       ┃  ┃ ┃  ┃        │  │ │  │
+  █  █  █  █       ┃  ┃ ┃  ┃        │  │ │  │
+  ████  ████       ┗━━┛ ┗━━┛        └──┘ └──┘
+
+  classic               bold
+   ███   ███            ████  ████
+  █   █ █   █           ██  ██ ██  ██
+  █   █ █   █           ██  ██ ██  ██
+  █   █ █   █           ██  ██ ██  ██
+   ███   ███            ████  ████
   ```
 
 - **Themes** — `neon` (default), `amber`, `blue`, `mono`. Set the default with
@@ -226,21 +237,38 @@ The shell entry point still works and behaves identically:
 flowclock start --goal "Deep work — StreamNet" --target 1h --break-budget 20m
 ```
 
-### Display style — `block` / `simple` / `outline` (cycle live)
+### Display style — `block` / `simple` / `outline` / `classic` / `bold` (cycle live)
 
-The Session counter has three looks, all using the **same reserve-first scaling**
+The Session counter has five looks, all using the **same reserve-first scaling**
 so they stay prominent without overshadowing the metadata:
 
 - **`block`** (default) — solid 7-segment glyphs.
 - **`simple`** — clean heavy **line** digits in box-drawing strokes; minimal but
-  full hero size. Distinct from `block` at every scale (including small windows).
-- **`outline`** — a hollow, edge-traced version of the solid block.
+  full hero size.
+- **`outline`** — a hollow, box-drawing **line-art** clock; a distinct hollow
+  glyph at every size (small, tiled, or maximised).
+- **`classic`** — tall, solid, **terminal-style numerals** (light weight) — a
+  familiar monospace clock.
+- **`bold`** — the `classic` letterforms with heavier strokes.
 
 Press **`d`** (or run `display` from the palette) to cycle
-`block → simple → outline`, and **`t`** to cycle the theme. Both choices are
-**saved to your config** as your new default — the same as running
-`config set displayStyle simple` / `config set theme neon`. The public default
-stays `block`; `simple` and `outline` are opt-in alternates.
+`block → simple → outline → classic → bold`, and **`t`** to cycle the theme. Both
+choices are **saved to your config** as your new default — the same as running
+`config set displayStyle classic` / `config set theme neon`. The public default
+stays `block`; the rest are opt-in alternates. (`classic`/`bold` are taller
+9-row fonts; the layout maths stay exact via style-aware metrics.)
+
+### Live session controls
+
+While a session runs, the **global footer** is the single source of control hints
+(the panel no longer duplicates them):
+
+- **`z`** — zen: hide the goal + focus/break metadata, leaving just the hero clock.
+- **`Enter`** — hide/show the controls row to remove visual noise once memorised.
+- **`p`** pause · **`b`** break · **`1`–`6`** category · **`r`** reset · **`q`** stop & save.
+
+On the **Sessions** list, **`Supr`/`Delete`** opens a confirmation modal
+(`[y] confirm · [n] cancel`) to delete the selected session from `sessions.json`.
 
 ### Command palette
 
@@ -252,8 +280,9 @@ a permanent bar** — it appears only when invoked and disappears when you press
 
 ```
 [Tab] / [1–6]  switch view     [↑↓] / [j k]  scroll
-[s] / [n]      new session     [Enter]        detail / start
+[s] / [n]      new session     [Enter]        detail / start · hide controls (live)
 [d]            display style   [t]            theme (both saved)
+[z]            zen (live)      [Supr]         delete session (Sessions · confirm)
 [/]            command palette [r]            refresh
 [q] / [Esc]    quit / close overlay
 ```
@@ -361,7 +390,7 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `theme` | `neon` | `neon` · `amber` · `blue` · `mono` |
-| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, or `outline` hollow block — all same scaling; cycle live with `d` |
+| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, `outline` hollow line-art, `classic` tall solid terminal numerals, or `bold` heavier — all same reserve-first scaling; cycle live with `d` |
 | `showControls` | `true` | show the controls footer (`--zen` overrides) |
 | `dailyFocusGoalS` | `14400` | daily focus goal in seconds (drives maximization %) |
 | `keybindings.{pause,break,category,reset,quit}` | `p` `b` `c` `r` `q` | in-session keys |
@@ -389,7 +418,9 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v2.0.0** ✅ | Flowtime break model (categories), targets + break budgets, proportional breaks, gamification (flow score/achievements), interactive TUI dashboard, visible controls + `--zen`, schema v3 |
 | **v3.0.0** ✅ | Dashboard as default command; Session hero view (big balanced counter, live controls); Help view; `/` command palette; `start --bare`; `dashboard --view`; live theme switching; reserve-first counter scaling |
 | **v3.1.0** ✅ | In-dashboard new-session form (goal/name/target/break); live + persisted display-style (`d`) and theme (`t`) toggles; scaled minimal `simple` style (shares `block`'s scaling) |
-| **v3.2.0** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
+| **v3.2.0** ✅ | `simple` reworked into a clean line font; `outline` added as a third selectable style; display-style toggle fixed on small/tiled windows |
+| **v3.3.0** ✅ | `classic` + `bold` terminal-style counter fonts; `outline` rewritten as clean line-art (fixes small/medium rendering); centered session layout; `z` zen + `Enter` hide-controls; delete a session from the dashboard (confirm modal); deduped controls footer |
+| **next** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 
 ## Contributing

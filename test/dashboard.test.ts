@@ -25,9 +25,11 @@ import { renderBreaks } from "../src/tui/views/breaks.js";
 
 // App under test (WS5)
 import { buildFrame, compositeOverlay } from "../src/tui/app.js";
-import type { LiveSession } from "../src/tui/app.js";
+import type { LiveSession, ViewName } from "../src/tui/app.js";
 import { emptyPaletteState } from "../src/tui/palette.js";
 import { emptySessionFormState } from "../src/tui/sessionform.js";
+import { emptyConfirmState, openConfirmState } from "../src/tui/confirm.js";
+import type { ConfirmState } from "../src/tui/confirm.js";
 
 // Command under test
 import { runDashboard } from "../src/commands/dashboard.js";
@@ -644,6 +646,9 @@ describe("buildFrame (WS5)", () => {
       theme: "neon" as const,
       form: emptySessionFormState(),
       displayStyle: "block" as const,
+      confirm: emptyConfirmState(),
+      zenLive: false,
+      hideControls: false,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -675,6 +680,9 @@ describe("buildFrame (WS5)", () => {
       theme: "neon" as const,
       form: emptySessionFormState(),
       displayStyle: "block" as const,
+      confirm: emptyConfirmState(),
+      zenLive: false,
+      hideControls: false,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -706,9 +714,81 @@ describe("buildFrame (WS5)", () => {
       theme: "neon" as const,
       form: emptySessionFormState(),
       displayStyle: "block" as const,
+      confirm: emptyConfirmState(),
+      zenLive: false,
+      hideControls: false,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     expect(frame).toHaveLength(24);
+  });
+
+  // ── v3.3.0: zen · hide-controls · confirm overlay · delete-hint footer ─────
+  function fcState(opts: {
+    view?: ViewName;
+    live?: LiveSession | null;
+    zenLive?: boolean;
+    hideControls?: boolean;
+    confirm?: ConfirmState;
+  } = {}) {
+    const live: LiveSession | null =
+      opts.live === undefined
+        ? { timer: new Timer(), goal: "test-goal", label: null, focusTargetS: null, breakBudgetS: null }
+        : opts.live;
+    return {
+      view: opts.view ?? ("session" as const),
+      sessions: [],
+      selectedIndex: 0,
+      scrollTop: 0,
+      detailOpen: false,
+      live,
+      palette: emptyPaletteState(),
+      summary: null,
+      theme: "neon" as const,
+      form: emptySessionFormState(),
+      displayStyle: "block" as const,
+      confirm: opts.confirm ?? emptyConfirmState(),
+      zenLive: opts.zenLive ?? false,
+      hideControls: opts.hideControls ?? false,
+    };
+  }
+
+  it("live footer shows [z] zen and [Enter] hide hints", () => {
+    const out = buildFrame(fcState(), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).toContain("zen");
+    expect(out).toContain("hide");
+  });
+
+  it("hideControls blanks the footer controls (no 'pause')", () => {
+    const out = buildFrame(fcState({ hideControls: true }), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).not.toContain("pause");
+  });
+
+  it("zen (zenLive) hides the goal from the body", () => {
+    const out = buildFrame(fcState({ zenLive: true }), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).not.toContain("test-goal");
+  });
+
+  it("confirm overlay renders the delete prompt + confirm footer", () => {
+    const confirm = openConfirmState({
+      title: "Delete session",
+      message: "Delete this session? This cannot be undone.",
+      payload: "sess-x",
+    });
+    const out = buildFrame(
+      fcState({ view: "sessions", live: null, confirm }),
+      100,
+      24,
+      makeFakeCtx(),
+    ).map(stripAnsi).join("\n");
+    expect(out).toContain("Delete this session");
+    expect(out).toContain("[y] confirm");
+  });
+
+  it("sessions view footer shows the [Supr] delete hint", () => {
+    const out = buildFrame(fcState({ view: "sessions", live: null }), 100, 24, makeFakeCtx())
+      .map(stripAnsi)
+      .join("\n");
+    expect(out).toContain("Supr");
   });
 
   it("palette open — frame contains 'Commands' panel title", () => {
@@ -725,6 +805,9 @@ describe("buildFrame (WS5)", () => {
       theme: "neon" as const,
       form: emptySessionFormState(),
       displayStyle: "block" as const,
+      confirm: emptyConfirmState(),
+      zenLive: false,
+      hideControls: false,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -745,6 +828,9 @@ describe("buildFrame (WS5)", () => {
       theme: "neon" as const,
       form: emptySessionFormState(),
       displayStyle: "block" as const,
+      confirm: emptyConfirmState(),
+      zenLive: false,
+      hideControls: false,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -765,6 +851,9 @@ describe("buildFrame (WS5)", () => {
       theme: "neon" as const,
       form: emptySessionFormState(),
       displayStyle: "block" as const,
+      confirm: emptyConfirmState(),
+      zenLive: false,
+      hideControls: false,
     };
     const frame = buildFrame(state, 80, 24, ctx);
     const combined = frame.map(stripAnsi).join("\n");
@@ -785,6 +874,9 @@ describe("buildFrame (WS5)", () => {
       theme: "neon" as const,
       form: emptySessionFormState(),
       displayStyle: "block" as const,
+      confirm: emptyConfirmState(),
+      zenLive: false,
+      hideControls: false,
     };
     const frame = buildFrame(state, 80, 30, ctx);
     expect(frame).toHaveLength(30);

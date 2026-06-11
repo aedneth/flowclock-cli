@@ -756,6 +756,10 @@ describe("parseKey", () => {
     expect(parseKey("\x1b[8~")).toEqual({ name: "end" });
   });
 
+  it("parses Delete / Supr (CSI 3~)", () => {
+    expect(parseKey("\x1b[3~")).toEqual({ name: "delete" });
+  });
+
   it("parses Ctrl-C as char with empty string char", () => {
     expect(parseKey("")).toEqual({ name: "char", char: "" });
   });

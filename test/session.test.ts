@@ -10,6 +10,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   appendSession,
+  deleteSession,
   readSessions,
   querySessions,
   makeSessionId,
@@ -47,6 +48,22 @@ describe("session store", () => {
     const { sessions } = readSessions(file);
     expect(sessions).toHaveLength(2);
     expect(sessions[1]!.durationS).toBe(120);
+  });
+
+  it("deletes a session by id and persists the rest", () => {
+    const a = appendSession(file, sample(60, "2026-05-01T10:00:00.000Z"));
+    const b = appendSession(file, sample(120, "2026-05-02T10:00:00.000Z"));
+    const remaining = deleteSession(file, a.id);
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0]!.id).toBe(b.id);
+    // persisted to disk, not just in memory
+    expect(readSessions(file).sessions.map((s) => s.id)).toEqual([b.id]);
+  });
+
+  it("deleteSession is a no-op for an unknown id", () => {
+    appendSession(file, sample(60, "2026-05-01T10:00:00.000Z"));
+    const remaining = deleteSession(file, "does-not-exist");
+    expect(remaining).toHaveLength(1);
   });
 
   it("recovers from a corrupt file by backing it up", () => {

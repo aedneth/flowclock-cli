@@ -3,6 +3,11 @@ import {
   renderBigLines,
   renderOutlineLines,
   renderSimpleLines,
+  renderClassicLines,
+  renderBoldLines,
+  renderCounter,
+  styleWidth,
+  styleBaseRows,
   bigWidth,
   computeScale,
   computeSessionScale,
@@ -138,7 +143,7 @@ describe("renderBigFrame", () => {
   });
 });
 
-describe("renderOutlineLines (minimal / simple style)", () => {
+describe("renderOutlineLines (hollow / outline style)", () => {
   it("matches the solid block's exact dimensions at the same scale", () => {
     for (const scale of [1, 2, 3]) {
       const solid = renderBigLines("12:34:56", scale);
@@ -147,27 +152,35 @@ describe("renderOutlineLines (minimal / simple style)", () => {
       outline.forEach((line, i) => {
         expect(line.length).toBe(solid[i]!.length);
       });
+      // Width parity with the block font keeps the reserve-first maths identical.
+      expect(outline[0]!.length).toBe(bigWidth("12:34:56", scale));
     }
   });
 
-  it("hollows out interiors at scale 3 (fewer block cells than the solid)", () => {
-    const solidCount = renderBigLines("8", 3).join("").split("█").length - 1;
-    const outlineCount = renderOutlineLines("8", 3).join("").split("█").length - 1;
-    expect(outlineCount).toBeLessThan(solidCount);
-    expect(outlineCount).toBeGreaterThan(0); // still a visible glyph
+  it("draws box-drawing line-art, never solid blocks", () => {
+    const joined = renderOutlineLines("12:34:56", 2).join("");
+    expect(joined).not.toContain("█");
+    expect(/[─│┌┐└┘▫]/.test(joined)).toBe(true);
   });
 
-  it("only ever emits the fill char and spaces", () => {
-    const chars = new Set(renderOutlineLines("00:00", 2).join(""));
-    for (const ch of chars) {
-      expect([" ", "█"]).toContain(ch);
-    }
+  it("is visually DISTINCT from block at scale 1 (fixes the small-window toggle)", () => {
+    // The OLD outline coincided with the solid block at scale 1–2; this must not.
+    const outline = renderOutlineLines("12:34:56", 1).join("\n");
+    const block = renderBigLines("12:34:56", 1).join("\n");
+    expect(outline).not.toBe(block);
   });
 
-  it("honours a custom fill character", () => {
-    const out = renderOutlineLines("0", 2, "▒").join("");
-    expect(out).toContain("▒");
-    expect(out).not.toContain("█");
+  it("hollows out interiors at scale 3 (interior cells blanked)", () => {
+    // The solid '8' is densely filled; the outline blanks its interior, so it
+    // has strictly fewer ink cells than the solid block.
+    const solidInk = renderBigLines("8", 3).join("").replace(/ /g, "").length;
+    const outlineInk = renderOutlineLines("8", 3).join("").replace(/ /g, "").length;
+    expect(outlineInk).toBeGreaterThan(0); // still a visible glyph
+    expect(outlineInk).toBeLessThan(solidInk);
+  });
+
+  it("scale=2 doubles the row count", () => {
+    expect(renderOutlineLines("0", 2).length).toBe(renderOutlineLines("0", 1).length * 2);
   });
 
   it("never throws on unexpected characters", () => {
@@ -214,5 +227,92 @@ describe("renderSimpleLines (heavy line / seven-segment style)", () => {
   it("never throws on unexpected characters", () => {
     expect(() => renderSimpleLines("ab", 2)).not.toThrow();
     expect(renderSimpleLines("?")).toHaveLength(BIG_ROWS);
+  });
+});
+
+describe("renderClassicLines / renderBoldLines (tall solid terminal fonts)", () => {
+  it("classic is 9 rows tall at scale 1 and scales the row count by scale", () => {
+    expect(renderClassicLines("12:34:56", 1)).toHaveLength(9);
+    expect(renderClassicLines("0", 3)).toHaveLength(27);
+    expect(styleBaseRows("classic")).toBe(9);
+  });
+
+  it("bold is 9 rows tall at scale 1 and scales the row count by scale", () => {
+    expect(renderBoldLines("12:34:56", 1)).toHaveLength(9);
+    expect(renderBoldLines("0", 2)).toHaveLength(18);
+    expect(styleBaseRows("bold")).toBe(9);
+  });
+
+  it("rendered width exactly matches styleWidth (parity for reserve-first maths)", () => {
+    for (const scale of [1, 2, 3]) {
+      const c = renderClassicLines("12:34:56", scale);
+      expect(c[0]!.length).toBe(styleWidth("classic", "12:34:56", scale));
+      expect(c.every((l) => l.length === c[0]!.length)).toBe(true);
+
+      const b = renderBoldLines("12:34:56", scale);
+      expect(b[0]!.length).toBe(styleWidth("bold", "12:34:56", scale));
+      expect(b.every((l) => l.length === b[0]!.length)).toBe(true);
+    }
+  });
+
+  it("uses solid block characters, no box-drawing line art", () => {
+    const c = renderClassicLines("8", 2).join("");
+    expect(c).toContain("█");
+    expect(/[─│┌┐└┘┃━]/.test(c)).toBe(false);
+    const b = renderBoldLines("8", 2).join("");
+    expect(b).toContain("█");
+  });
+
+  it("bold is heavier than classic (more ink for the same time)", () => {
+    const ink = (rows: string[]) => rows.join("").replace(/ /g, "").length;
+    expect(ink(renderBoldLines("12:34:56", 1))).toBeGreaterThan(ink(renderClassicLines("12:34:56", 1)));
+  });
+
+  it("classic and bold are visually distinct from block, simple, outline", () => {
+    const samples = ["12:34:56"] as const;
+    for (const t of samples) {
+      const classic = renderClassicLines(t, 2).join("\n");
+      const bold = renderBoldLines(t, 2).join("\n");
+      expect(classic).not.toBe(bold);
+      // distinct dimensions from the 5-row families guarantees distinctness
+      expect(renderClassicLines(t, 1).length).not.toBe(renderBigLines(t, 1).length);
+    }
+  });
+
+  it("never throws on unexpected characters", () => {
+    expect(() => renderClassicLines("ab", 2)).not.toThrow();
+    expect(() => renderBoldLines("??", 3)).not.toThrow();
+    expect(renderClassicLines("?")).toHaveLength(9);
+  });
+});
+
+describe("renderCounter (style dispatcher)", () => {
+  it("dispatches each style to its renderer", () => {
+    const t = "12:34:56";
+    expect(renderCounter("block", t, 2)).toEqual(renderBigLines(t, 2));
+    expect(renderCounter("simple", t, 2)).toEqual(renderSimpleLines(t, 2));
+    expect(renderCounter("outline", t, 2)).toEqual(renderOutlineLines(t, 2));
+    expect(renderCounter("classic", t, 2)).toEqual(renderClassicLines(t, 2));
+    expect(renderCounter("bold", t, 2)).toEqual(renderBoldLines(t, 2));
+  });
+});
+
+describe("computeSessionScale — style-aware", () => {
+  it("block width matches the legacy bigWidth (back-compat)", () => {
+    expect(styleWidth("block", "00:00:00", 1)).toBe(bigWidth("00:00:00", 1));
+  });
+
+  it("tall classic font yields a smaller scale than block in the same area", () => {
+    // 9-row classic needs more vertical room per scale step than 5-row block.
+    const area = { c: 120, r: 24 } as const;
+    const blockScale = computeSessionScale(area.c, area.r, "00:00:00", { style: "block" });
+    const classicScale = computeSessionScale(area.c, area.r, "00:00:00", { style: "classic" });
+    expect(classicScale).toBeLessThanOrEqual(blockScale);
+  });
+
+  it("still returns >= 1 for every style on a tiny area", () => {
+    for (const style of ["block", "simple", "outline", "classic", "bold"] as const) {
+      expect(computeSessionScale(10, 4, "00:00:00", { style })).toBeGreaterThanOrEqual(1);
+    }
   });
 });

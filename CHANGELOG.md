@@ -6,6 +6,58 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.3.0] - 2026-06-10
+
+Adds two terminal-style counter fonts, in-dashboard session deletion, zen and
+hide-controls toggles, a centered session layout, and fixes the `outline` style
+and a duplicated controls footer.
+
+### Added
+
+- **New `classic` display style** — tall, solid, terminal-style numerals that
+  recreate a familiar monospace clock (light weight). And **new `bold` style** —
+  the same letterforms with heavier strokes. The display cycle is now
+  `block → simple → outline → classic → bold` (press `d`, or `display` in the
+  `/` palette); all are saved to your config. Both keep `block`'s exact
+  reserve-first scaling via style-aware metrics (they're taller — 9 rows — but
+  the layout maths stay exact).
+- **`z` toggles zen** during a live session — hides the goal and the
+  focus/break metadata so only the hero counter shows.
+- **`Enter` toggles the controls row** during a live session — hides the footer
+  hints to remove visual noise once you've memorised them; press `Enter` again
+  to bring them back.
+- **Delete a session from the dashboard.** On the Sessions list, `Supr`/`Delete`
+  opens a confirmation modal (`[y] confirm · [n] cancel`); confirming removes it
+  from `sessions.json` and refreshes. `Enter` in the modal cancels (safe
+  default — it never deletes).
+
+### Changed
+
+- **`outline` is now clean line-art at every size.** It traces each glyph's
+  silhouette with box-drawing characters, so it reads as a distinct hollow clock
+  at **every** scale — including small/tiled windows — instead of looking like a
+  solid block (small) or a block with holes (medium).
+- **Centered session layout.** The goal sits centered above the counter and the
+  focus/break/ratio metadata sit centered below it, for a calmer, more balanced
+  panel.
+
+### Fixed
+
+- **`outline` no longer breaks on small/medium windows.** The old edge-detection
+  coincided pixel-for-pixel with `block` at scale 1–2 (so cycling to `outline`
+  in a small window looked like nothing changed) and only hollowed out — with
+  visible holes — once fully maximised.
+- **Duplicated controls footer.** The session panel used to render its own
+  controls line *and* the dashboard's global footer, which doubled up on small
+  windows. The panel no longer renders controls — the global footer is the
+  single source.
+
+### Notes
+
+- **Public default is unchanged: `displayStyle` stays `block`** for everyone.
+- The standalone `--bare`/`--zen` HUD still renders the compact single line for
+  any non-`block` style; the scaled fonts are a dashboard feature.
+
 ## [3.2.0] - 2026-06-10
 
 Refines the `simple` display style into a clean line font, adds a third
@@ -249,7 +301,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.2.0...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.3.0...HEAD
+[3.3.0]: https://github.com/aedneth/flowclock-cli/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/aedneth/flowclock-cli/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aedneth/flowclock-cli/compare/v3.0.0...v3.1.0
 [3.0.0]: https://github.com/aedneth/flowclock-cli/compare/v2.0.0...v3.0.0
