@@ -221,21 +221,69 @@ export function renderSimpleLines(time: string, scale = 1): string[] {
 }
 
 /**
- * Render a clock string as a LIGHT-line clock — the "outline" display style.
+ * Render a clock string as a LIGHT-line clock — the "minimal" display style.
  * Same clean seven-segment skeleton as `simple`, but drawn in LIGHT box-drawing
  * characters (┌─┐ │ ├─┤ └─┘) with an airy "○" colon, so it reads as a distinct,
- * hollow/airy style next to the heavy `simple` and the solid `block` at every
- * scale.
+ * minimal/airy line font next to the heavy `simple`, the silhouette `outline`,
+ * and the solid `block`. The seven-segment skeleton keeps every stroke one cell
+ * thick at any scale, so the digits stay crisp when scaled up.
+ */
+export function renderMinimalLines(time: string, scale = 1): string[] {
+  return renderSevenSeg(time, scale, false, "○");
+}
+
+/**
+ * Exposed-wall bitmask → box-drawing character tracing a glyph's silhouette.
  *
- * Earlier versions traced the silhouette of the solid block font. That looked
- * fine at scale 1 but BROKE at scale ≥ 2: each one-cell-thick block stroke,
- * once enlarged, was outlined into a doubled hollow "tube" (spurious inner
- * lines) — the garbled rendering seen in tiled/large windows. Drawing the
- * seven-segment skeleton directly keeps every stroke one cell thick at any
- * scale, so the digits stay crisp.
+ * For a filled cell we look at which of its four sides face an EMPTY cell (or
+ * the grid edge) — those are "walls". The bitmask is T=8 · B=4 · L=2 · R=1, and
+ * the chosen char draws the wall(s) so the union of all cells forms a clean
+ * line-art outline of the digit. Interior cells (no exposed walls) map to a
+ * blank, hollowing the glyph at EVERY scale.
+ */
+const OUTLINE_CHARS: Record<number, string> = {
+  0: " ", // interior → hollow
+  8: "─", 4: "─", 2: "│", 1: "│", // single wall
+  12: "─", 3: "│", // opposite walls (thin bar / thin column)
+  10: "┌", 9: "┐", 6: "└", 5: "┘", // corners (T+L, T+R, B+L, B+R)
+  14: "─", 13: "─", 11: "│", 7: "│", // three walls → follow the dominant axis
+  15: "▫", // isolated cell (e.g. colon dot)
+};
+
+/**
+ * Render a clock string as a HOLLOW SILHOUETTE clock — the "outline" display
+ * style. It shares the exact geometry, scaling and dimensions of the solid
+ * `renderBigLines` (so the reserve-first layout maths are identical), but each
+ * glyph is drawn as box-drawing line-art: every filled cell becomes a
+ * box-drawing character tracing the parts of its border that face empty space,
+ * and interior cells are blanked. The result is a distinctive double-walled
+ * hollow digit that reads as a unique style at every scale — including scale 1.
+ *
+ * This is intentionally NOT the seven-segment skeleton used by `simple` /
+ * `minimal`: as the digit scales up, each block stroke (one cell thick at scale
+ * 1) is traced into a hollow "tube", giving the characteristic nested-rectangle
+ * silhouette that distinguishes `outline` from the other line fonts.
  */
 export function renderOutlineLines(time: string, scale = 1): string[] {
-  return renderSevenSeg(time, scale, false, "○");
+  const solid = renderBigLines(time, scale);
+  const grid = solid.map((line) => [...line]);
+  const H = grid.length;
+  const filled = (r: number, c: number): boolean =>
+    r >= 0 && r < H && c >= 0 && c < (grid[r]?.length ?? 0) && grid[r]![c] === "█";
+
+  return grid.map((cells, r) =>
+    cells
+      .map((ch, c) => {
+        if (ch !== "█") return " ";
+        const mask =
+          (filled(r - 1, c) ? 0 : 8) |
+          (filled(r + 1, c) ? 0 : 4) |
+          (filled(r, c - 1) ? 0 : 2) |
+          (filled(r, c + 1) ? 0 : 1);
+        return OUTLINE_CHARS[mask] ?? " ";
+      })
+      .join(""),
+  );
 }
 
 /**
@@ -260,14 +308,49 @@ export function computeSessionScale(
   return Math.max(1, Math.min(ws, hs, cap));
 }
 
+/**
+ * Pick a scale that gives every style a CONSISTENT rendered footprint, so the
+ * counter does not jump in size when cycling display styles with `d`.
+ *
+ * The problem: the tall (9-row) `classic`/`bold` fonts, scaled independently to
+ * fill the area, rendered ~1.8× taller than the 5-row fonts at the same window
+ * size — towering over them and even crowding out the goal line. Here the 5-row
+ * `block` font is the reference: we scale every style toward the SAME target
+ * rendered height (block's), so all styles occupy roughly the same vertical
+ * footprint. 5-row styles are unaffected (they already match block exactly);
+ * the tall fonts pick the integer scale whose height is closest to the
+ * reference without exceeding what physically fits.
+ */
+export function uniformCounterScale(
+  areaCols: number,
+  areaRows: number,
+  time: string,
+  style: DisplayStyle,
+): number {
+  // Reference: how tall the 5-row block font renders in this area.
+  const refScale = computeSessionScale(areaCols, areaRows, time, { style: "block" });
+  const refHeight = refScale * styleBaseRows("block");
+
+  // Largest scale that physically fits this style in the area.
+  const natural = computeSessionScale(areaCols, areaRows, time, { style });
+
+  // 5-row styles already match the reference; only the tall fonts need taming.
+  if (styleBaseRows(style) === styleBaseRows("block")) return natural;
+
+  // Scale the tall font toward the reference height (nearest integer, ≥ 1),
+  // then clamp to what actually fits so we never overflow the area.
+  const target = Math.max(1, Math.round(refHeight / styleBaseRows(style)));
+  return Math.min(natural, target);
+}
+
 // ---------------------------------------------------------------------------
 // Tall solid "classic" / "bold" fonts — terminal-style numerals
 // ---------------------------------------------------------------------------
 
 /**
- * Per-style glyph geometry. `block`/`simple`/`outline` share the original
- * 5-row, 4-wide-digit footprint; `classic`/`bold` are taller (9 rows) solid
- * letterforms. Threading these metrics through the scaling maths keeps the
+ * Per-style glyph geometry. `block`/`simple`/`outline`/`minimal` share the
+ * original 5-row, 4-wide-digit footprint; `classic`/`bold` are taller (9 rows)
+ * solid letterforms. Threading these metrics through the scaling maths keeps the
  * reserve-first layout exact for every style.
  */
 interface StyleMetrics {
@@ -280,6 +363,7 @@ const STYLE_METRICS: Record<DisplayStyle, StyleMetrics> = {
   block:   { rows: BIG_ROWS, digitW: 4, colonW: 1 },
   simple:  { rows: BIG_ROWS, digitW: 4, colonW: 1 },
   outline: { rows: BIG_ROWS, digitW: 4, colonW: 1 },
+  minimal: { rows: BIG_ROWS, digitW: 4, colonW: 1 },
   classic: { rows: 9, digitW: 5, colonW: 1 },
   bold:    { rows: 9, digitW: 6, colonW: 2 },
 };
@@ -373,6 +457,7 @@ export function renderCounter(style: DisplayStyle, time: string, scale = 1): str
   switch (style) {
     case "simple":  return renderSimpleLines(time, scale);
     case "outline": return renderOutlineLines(time, scale);
+    case "minimal": return renderMinimalLines(time, scale);
     case "classic": return renderClassicLines(time, scale);
     case "bold":    return renderBoldLines(time, scale);
     default:        return renderBigLines(time, scale);

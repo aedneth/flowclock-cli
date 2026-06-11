@@ -20,7 +20,7 @@ import {
   renderCounter,
   styleWidth,
   styleBaseRows,
-  computeSessionScale,
+  uniformCounterScale,
 } from "../../lib/bigfont.js";
 import type { DisplayStyle } from "../../schemas/config.js";
 
@@ -42,7 +42,7 @@ export interface SessionViewState {
   focusTargetS: number | null;
   breakBudgetS: number | null;
   zen: boolean;                    // hide goal + metadata (hero clock only)
-  displayStyle: DisplayStyle;      // block · simple · outline · classic · bold
+  displayStyle: DisplayStyle;      // block · simple · outline · minimal · classic · bold
 }
 
 // ---------------------------------------------------------------------------
@@ -219,7 +219,10 @@ export function renderSession(
     counterLines = [line];
   } else {
     const counterAreaRows = Math.max(styleBaseRows(plan.style), innerH - reserved);
-    const scale = computeSessionScale(innerW, counterAreaRows, time, { style: plan.style });
+    // Uniform scaling: every style targets the same rendered footprint as the
+    // 5-row block font, so cycling styles never makes the counter jump in size
+    // (the tall classic/bold fonts no longer tower over the line fonts).
+    const scale = uniformCounterScale(innerW, counterAreaRows, time, plan.style);
     // Every style shares the reserve-first scaling maths via style-aware metrics
     // (styleWidth / styleBaseRows); they differ only in glyph rendering:
     //   "block"   solid block glyphs (default; also the tall-font fallback)
