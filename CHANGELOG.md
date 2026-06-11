@@ -6,6 +6,30 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.3.1] - 2026-06-11
+
+Fixes the `outline`, `classic`, and `bold` styles collapsing in a minimized
+window that is also showing session metadata (non-zen). Rendering only — no CLI,
+config, or data-schema changes.
+
+### Fixed
+
+- **`outline` no longer garbles at large scale.** It previously traced the
+  silhouette of the solid block font, which looked right at scale 1 but, when
+  enlarged (tiled/large windows), outlined each one-cell stroke into a doubled
+  hollow "tube" with spurious inner lines. It is now drawn as a clean
+  **light-weight seven-segment** skeleton (`┌─┐ │ └─┘`, airy `○` colon), so every
+  stroke stays one cell thick and the digits are crisp at **every** scale. It
+  keeps the exact width/height geometry of `block`, so layout maths are
+  unchanged, and stays distinct from the heavy `simple` style.
+- **`classic` / `bold` no longer collapse to a tiny text clock** when a minimized
+  window is also showing the focus/break metadata. The session view now degrades
+  gracefully: it keeps the requested font if it fits, else **drops the goal line**
+  to reclaim rows, else falls back from a tall (9-row) font to the **5-row block
+  font**, and only collapses to a single text line when even a 5-row glyph cannot
+  fit. The metadata stays visible throughout. (Zen mode was already fine because
+  it hides the metadata.)
+
 ## [3.3.0] - 2026-06-10
 
 Adds two terminal-style counter fonts, in-dashboard session deletion, zen and
@@ -301,7 +325,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.3.0...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.3.1...HEAD
+[3.3.1]: https://github.com/aedneth/flowclock-cli/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/aedneth/flowclock-cli/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/aedneth/flowclock-cli/compare/v3.1.0...v3.2.0
 [3.1.0]: https://github.com/aedneth/flowclock-cli/compare/v3.0.0...v3.1.0

@@ -442,3 +442,53 @@ describe("renderSession — classic & bold display styles", () => {
     });
   }
 });
+
+// ---------------------------------------------------------------------------
+// Minimized window + metadata + NON-zen — the collapse bug (v3.3.1)
+//
+// Tall fonts (classic/bold) used to collapse straight to a one-line text clock
+// when a minimized window was also showing session metadata. They must instead
+// degrade gracefully to a real glyph clock (their own font once it fits, else
+// the 5-row block font) while keeping the focus/break metadata visible.
+// ---------------------------------------------------------------------------
+
+describe("renderSession — tall fonts do not collapse in a minimized window", () => {
+  // Time with all-distinct digits so a lone "00:12:34" text line is detectable.
+  const mini = (style: SessionViewState["displayStyle"], h: number) =>
+    renderSession(
+      activeState({ displayStyle: style, time: "00:12:34", goal: "Flowclock" }),
+      rect(62, h),
+      "neon",
+      false,
+    ).map(strip);
+
+  for (const style of ["classic", "bold"] as const) {
+    it(`${style}: H14 with metadata renders a real glyph clock, not a text line`, () => {
+      const rows = mini(style, 14);
+      const joined = rows.join("\n");
+      // Metadata still present (the whole point of NON-zen).
+      expect(joined).toContain("focus");
+      expect(joined).toContain("break");
+      // A real block-glyph counter is drawn (solid blocks in the counter area).
+      expect(joined).toContain("█");
+      // The counter is NOT the collapsed single text line: the literal clock
+      // string must NOT appear as a contiguous run.
+      expect(joined).not.toContain("00:12:34");
+    });
+
+    it(`${style}: H12 (tighter) still shows a glyph clock + metadata`, () => {
+      const joined = mini(style, 12).join("\n");
+      expect(joined).toContain("focus");
+      expect(joined).toContain("█");
+      expect(joined).not.toContain("00:12:34");
+    });
+  }
+
+  it("outline: H16 renders clean light line-art (no solid blocks in the counter)", () => {
+    const rows = mini("outline", 16);
+    const counter = rows.filter((r) => /[─│┌┐└┘]/.test(r)).join("");
+    expect(counter.length).toBeGreaterThan(0); // line-art is present
+    // Light box-drawing only — never the heavy seven-seg strokes.
+    expect(/[┃━┏┓┗┛]/.test(counter)).toBe(false);
+  });
+});

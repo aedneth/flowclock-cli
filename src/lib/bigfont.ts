@@ -93,38 +93,42 @@ const SEVEN_SEG: Record<string, string> = {
 };
 
 /**
- * Pick the heavy box-drawing character for a junction, given which of the four
- * directions have a stroke emanating from this cell. Lone stubs continue the
- * stroke (┃/━) rather than using half-caps, so digit edges read as clean,
- * continuous lines.
+ * Pick the box-drawing character for a junction, given which of the four
+ * directions have a stroke emanating from this cell. `heavy` selects the weight
+ * (┃━┏┓ vs │─┌┐). Lone stubs continue the stroke (┃/━ or │/─) rather than using
+ * half-caps, so digit edges read as clean, continuous lines.
  */
-function boxChar(up: boolean, down: boolean, left: boolean, right: boolean): string {
+function boxChar(up: boolean, down: boolean, left: boolean, right: boolean, heavy: boolean): string {
+  const v = heavy ? "┃" : "│";
+  const h = heavy ? "━" : "─";
   const key = (up ? 8 : 0) | (down ? 4 : 0) | (left ? 2 : 0) | (right ? 1 : 0);
   switch (key) {
-    case 0b1100: return "┃"; // up + down
-    case 0b0011: return "━"; // left + right
-    case 0b0101: return "┏"; // down + right
-    case 0b0110: return "┓"; // down + left
-    case 0b1001: return "┗"; // up + right
-    case 0b1010: return "┛"; // up + left
-    case 0b1101: return "┣"; // up + down + right
-    case 0b1110: return "┫"; // up + down + left
-    case 0b0111: return "┳"; // down + left + right
-    case 0b1011: return "┻"; // up + left + right
-    case 0b1111: return "╋"; // all four
-    case 0b1000: // lone up   → continue vertical
-    case 0b0100: return "┃";  // lone down
-    case 0b0010: // lone left → continue horizontal
-    case 0b0001: return "━";  // lone right
+    case 0b1100: return v;                  // up + down
+    case 0b0011: return h;                  // left + right
+    case 0b0101: return heavy ? "┏" : "┌";  // down + right
+    case 0b0110: return heavy ? "┓" : "┐";  // down + left
+    case 0b1001: return heavy ? "┗" : "└";  // up + right
+    case 0b1010: return heavy ? "┛" : "┘";  // up + left
+    case 0b1101: return heavy ? "┣" : "├";  // up + down + right
+    case 0b1110: return heavy ? "┫" : "┤";  // up + down + left
+    case 0b0111: return heavy ? "┳" : "┬";  // down + left + right
+    case 0b1011: return heavy ? "┻" : "┴";  // up + left + right
+    case 0b1111: return heavy ? "╋" : "┼";  // all four
+    case 0b1000:                            // lone up   → continue vertical
+    case 0b0100: return v;                  // lone down
+    case 0b0010:                            // lone left → continue horizontal
+    case 0b0001: return h;                  // lone right
     default: return " ";
   }
 }
 
 /** Render one seven-segment digit as a scale-sized grid of box-drawing rows. */
-function digitGrid(seg: string, scale: number): string[] {
+function digitGrid(seg: string, scale: number, heavy: boolean): string[] {
   const W = 4 * scale;
   const H = BIG_ROWS * scale;
   const mid = Math.floor(H / 2);
+  const hbar = heavy ? "━" : "─";
+  const vbar = heavy ? "┃" : "│";
   const a = seg[0] === "1", b = seg[1] === "1", c = seg[2] === "1", d = seg[3] === "1";
   const e = seg[4] === "1", f = seg[5] === "1", g = seg[6] === "1";
 
@@ -134,55 +138,56 @@ function digitGrid(seg: string, scale: number): string[] {
 
   // Horizontal strokes (interior columns only; corners handled below).
   for (let x = 1; x < W - 1; x++) {
-    if (a) grid[0]![x] = "━";
-    if (g) grid[mid]![x] = "━";
-    if (d) grid[H - 1]![x] = "━";
+    if (a) grid[0]![x] = hbar;
+    if (g) grid[mid]![x] = hbar;
+    if (d) grid[H - 1]![x] = hbar;
   }
   // Vertical strokes (interior rows only).
   for (let y = 1; y < mid; y++) {
-    if (f) grid[y]![0] = "┃";
-    if (b) grid[y]![W - 1] = "┃";
+    if (f) grid[y]![0] = vbar;
+    if (b) grid[y]![W - 1] = vbar;
   }
   for (let y = mid + 1; y < H - 1; y++) {
-    if (e) grid[y]![0] = "┃";
-    if (c) grid[y]![W - 1] = "┃";
+    if (e) grid[y]![0] = vbar;
+    if (c) grid[y]![W - 1] = vbar;
   }
   // Six corner / junction cells.
-  grid[0]![0]       = boxChar(false, f, false, a);
-  grid[0]![W - 1]   = boxChar(false, b, a, false);
-  grid[mid]![0]     = boxChar(f, e, false, g);
-  grid[mid]![W - 1] = boxChar(b, c, g, false);
-  grid[H - 1]![0]   = boxChar(e, false, false, d);
-  grid[H - 1]![W - 1] = boxChar(c, false, d, false);
+  grid[0]![0]       = boxChar(false, f, false, a, heavy);
+  grid[0]![W - 1]   = boxChar(false, b, a, false, heavy);
+  grid[mid]![0]     = boxChar(f, e, false, g, heavy);
+  grid[mid]![W - 1] = boxChar(b, c, g, false, heavy);
+  grid[H - 1]![0]   = boxChar(e, false, false, d, heavy);
+  grid[H - 1]![W - 1] = boxChar(c, false, d, false, heavy);
 
   return grid.map((row) => row.join(""));
 }
 
-/** Render a colon (two dots) at `scale`, matching the block colon's width. */
-function colonGrid(scale: number): string[] {
+/** Render a colon (two `dot` marks) at `scale`, matching the block colon's width. */
+function colonGrid(scale: number, dot: string): string[] {
   const W = scale; // 1 * scale, identical to the block colon's width
   const H = BIG_ROWS * scale;
   const cx = Math.floor((W - 1) / 2);
   const upper = Math.floor(H * 0.3);
   const lower = Math.floor(H * 0.7);
   return Array.from({ length: H }, (_, r) =>
-    Array.from({ length: W }, (_, x) => (x === cx && (r === upper || r === lower) ? "●" : " ")).join(""),
+    Array.from({ length: W }, (_, x) => (x === cx && (r === upper || r === lower) ? dot : " ")).join(""),
   );
 }
 
 /**
- * Render a clock string as a MINIMAL heavy-line clock — the "simple" display
- * style. Each digit is drawn as a clean seven-segment glyph in heavy
- * box-drawing characters (┏━┓ ┃ ┣━┫ ┗━┛) instead of solid blocks.
+ * Shared seven-segment renderer for the line-art styles. Each digit is a clean
+ * seven-segment glyph drawn in box-drawing characters; `heavy` selects the
+ * stroke weight (┏━┓┃ vs ┌─┐│) and `dot` is the colon mark.
  *
  * It shares the EXACT width/height geometry of the solid `renderBigLines`
  * (digit = 4·scale wide, colon = 1·scale wide, gap = scale, height =
  * BIG_ROWS·scale), so the reserve-first scaling maths and small-panel fallback
- * thresholds are byte-for-byte identical to the block style. Unlike the old
- * edge-traced outline, it reads as distinctly different from `block` at every
- * scale — including scale 1 — so toggling styles is always visible.
+ * thresholds are byte-for-byte identical to the block style. Crucially, it
+ * scales cleanly at EVERY integer scale — each stroke stays exactly one cell
+ * thick — unlike a silhouette traced from a solid block, which hollows every
+ * stroke into a doubled "tube" at scale ≥ 2.
  */
-export function renderSimpleLines(time: string, scale = 1): string[] {
+function renderSevenSeg(time: string, scale: number, heavy: boolean, dot: string): string[] {
   const H = BIG_ROWS * scale;
   const rows: string[] = Array.from({ length: H }, () => "");
   const chars = [...time];
@@ -191,9 +196,9 @@ export function renderSimpleLines(time: string, scale = 1): string[] {
   chars.forEach((chr, idx) => {
     let glyph: string[];
     if (chr === ":") {
-      glyph = colonGrid(scale);
+      glyph = colonGrid(scale, dot);
     } else if (SEVEN_SEG[chr]) {
-      glyph = digitGrid(SEVEN_SEG[chr]!, scale);
+      glyph = digitGrid(SEVEN_SEG[chr]!, scale, heavy);
     } else {
       // Unknown char → blank column matching the block font's blank width.
       glyph = Array.from({ length: H }, () => " ".repeat(scale));
@@ -206,57 +211,31 @@ export function renderSimpleLines(time: string, scale = 1): string[] {
 }
 
 /**
- * Exposed-wall bitmask → box-drawing character tracing a glyph's silhouette.
- *
- * For a filled cell we look at which of its four sides face an EMPTY cell (or
- * the grid edge) — those are "walls". The bitmask is T=8 · B=4 · L=2 · R=1, and
- * the chosen char draws the wall(s) so the union of all cells forms a clean
- * line-art outline of the digit. Interior cells (no exposed walls) map to a
- * blank, hollowing the glyph at EVERY scale.
+ * Render a clock string as a MINIMAL HEAVY-line clock — the "simple" display
+ * style. Each digit is a clean seven-segment glyph in heavy box-drawing
+ * characters (┏━┓ ┃ ┣━┫ ┗━┛) instead of solid blocks. Distinct from `block` at
+ * every scale — including scale 1 — so toggling styles is always visible.
  */
-const OUTLINE_CHARS: Record<number, string> = {
-  0: " ", // interior → hollow
-  8: "─", 4: "─", 2: "│", 1: "│", // single wall
-  12: "─", 3: "│", // opposite walls (thin bar / thin column)
-  10: "┌", 9: "┐", 6: "└", 5: "┘", // corners (T+L, T+R, B+L, B+R)
-  14: "─", 13: "─", 11: "│", 7: "│", // three walls → follow the dominant axis
-  15: "▫", // isolated cell (e.g. colon dot)
-};
+export function renderSimpleLines(time: string, scale = 1): string[] {
+  return renderSevenSeg(time, scale, true, "●");
+}
 
 /**
- * Render a clock string as a HOLLOW / OUTLINE clock — the "outline" display
- * style. It shares the exact geometry, scaling and dimensions of the solid
- * `renderBigLines` (so the reserve-first layout maths are identical), but each
- * glyph is drawn as airy line-art: every filled cell becomes a box-drawing
- * character tracing the parts of its border that face empty space, and interior
- * cells are blanked.
+ * Render a clock string as a LIGHT-line clock — the "outline" display style.
+ * Same clean seven-segment skeleton as `simple`, but drawn in LIGHT box-drawing
+ * characters (┌─┐ │ ├─┤ └─┘) with an airy "○" colon, so it reads as a distinct,
+ * hollow/airy style next to the heavy `simple` and the solid `block` at every
+ * scale.
  *
- * Unlike the previous edge-detection approach (which coincided pixel-for-pixel
- * with the solid block at scale 1–2 and only hollowed out at scale 3+, the
- * source of the "invisible toggle / holes in a small window" bug), this reads
- * as a distinct hollow glyph at EVERY scale — including scale 1 — because it
- * emits box-drawing strokes instead of solid blocks.
+ * Earlier versions traced the silhouette of the solid block font. That looked
+ * fine at scale 1 but BROKE at scale ≥ 2: each one-cell-thick block stroke,
+ * once enlarged, was outlined into a doubled hollow "tube" (spurious inner
+ * lines) — the garbled rendering seen in tiled/large windows. Drawing the
+ * seven-segment skeleton directly keeps every stroke one cell thick at any
+ * scale, so the digits stay crisp.
  */
 export function renderOutlineLines(time: string, scale = 1): string[] {
-  const solid = renderBigLines(time, scale);
-  const grid = solid.map((line) => [...line]);
-  const H = grid.length;
-  const filled = (r: number, c: number): boolean =>
-    r >= 0 && r < H && c >= 0 && c < (grid[r]?.length ?? 0) && grid[r]![c] === "█";
-
-  return grid.map((cells, r) =>
-    cells
-      .map((ch, c) => {
-        if (ch !== "█") return " ";
-        const mask =
-          (filled(r - 1, c) ? 0 : 8) |
-          (filled(r + 1, c) ? 0 : 4) |
-          (filled(r, c - 1) ? 0 : 2) |
-          (filled(r, c + 1) ? 0 : 1);
-        return OUTLINE_CHARS[mask] ?? " ";
-      })
-      .join(""),
-  );
+  return renderSevenSeg(time, scale, false, "○");
 }
 
 /**
