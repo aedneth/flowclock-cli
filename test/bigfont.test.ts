@@ -186,6 +186,23 @@ describe("renderOutlineLines (hollow / outline style)", () => {
   it("never throws on unexpected characters", () => {
     expect(() => renderOutlineLines("ab", 2)).not.toThrow();
   });
+
+  it("scales cleanly at scale >= 2 — light-weight twin of simple, no heavy strokes", () => {
+    // Regression: the old silhouette-of-block outline hollowed each one-cell
+    // stroke into a doubled "tube" at scale >= 2 (garbled in tiled windows).
+    // The seven-segment skeleton has its ink in the SAME cells as `simple`
+    // (so it scales just as cleanly) but in LIGHT box-drawing characters.
+    for (const scale of [1, 2, 3]) {
+      const outline = renderOutlineLines("12:34:56", scale);
+      const simple = renderSimpleLines("12:34:56", scale);
+      const mask = (rows: string[]) =>
+        rows.map((l) => [...l].map((c) => (c === " " ? " " : "#")).join(""));
+      expect(mask(outline)).toEqual(mask(simple)); // identical skeleton → scales cleanly
+      const joined = outline.join("");
+      expect(/[┃━┏┓┗┛┣┫┳┻╋]/.test(joined)).toBe(false); // light strokes only
+      expect(/[─│┌┐└┘]/.test(joined)).toBe(true);
+    }
+  });
 });
 
 describe("renderSimpleLines (heavy line / seven-segment style)", () => {

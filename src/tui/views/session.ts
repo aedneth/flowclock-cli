@@ -62,6 +62,59 @@ function blankLine(innerW: number): string {
   return padTo("", innerW);
 }
 
+/** How the counter will be drawn: a real style, or the single-line text clock. */
+interface CounterPlan {
+  /** The style to render the counter in, or "text" for the tiny fallback. */
+  style: DisplayStyle | "text";
+  /** Whether the goal line is kept (dropped first to reclaim vertical room). */
+  showGoal: boolean;
+}
+
+/**
+ * Decide how to fit the counter into the available rows — the graceful
+ * degradation ladder that keeps a real glyph clock on screen far longer:
+ *
+ *   1. requested style at its base height, keeping the goal line;
+ *   2. requested style, with the goal line DROPPED to reclaim two rows;
+ *   3. tall fonts (classic/bold, 9 rows) fall back to the 5-row `block` font,
+ *      keeping then dropping the goal;
+ *   4. only when even a 5-row font cannot fit do we collapse to the single
+ *      centered text line.
+ *
+ * Without this, a minimized window showing session metadata left no room for the
+ * 9-row classic/bold fonts, so they collapsed straight to the tiny text clock.
+ */
+function planCounter(
+  innerW: number,
+  innerH: number,
+  time: string,
+  style: DisplayStyle,
+  hasGoal: boolean,
+  bottomCount: number,
+): CounterPlan {
+  const bottomReserve = bottomCount > 0 ? bottomCount + 1 : 0; // lines + gap
+  const fits = (st: DisplayStyle, goalRows: number): boolean =>
+    innerW >= styleWidth(st, time, 1) &&
+    innerH - (goalRows + bottomReserve) >= styleBaseRows(st);
+
+  const goalRows = hasGoal ? 2 : 0; // goal line + its gap
+
+  // 1-2: requested style, keeping the goal if it fits, else dropping it.
+  if (fits(style, goalRows)) return { style, showGoal: hasGoal };
+  if (hasGoal && fits(style, 0)) return { style, showGoal: false };
+
+  // 3-4: tall fonts degrade to the 5-row block font before giving up on glyphs.
+  const isTall = styleBaseRows(style) > styleBaseRows("block");
+  if (isTall) {
+    if (fits("block", goalRows)) return { style: "block", showGoal: hasGoal };
+    if (hasGoal && fits("block", 0)) return { style: "block", showGoal: false };
+  }
+
+  // 5: last resort — single centered text line. Keep the goal only if there is
+  // still a row for the clock after the goal + metadata.
+  return { style: "text", showGoal: hasGoal && innerH - (goalRows + bottomReserve) >= 1 };
+}
+
 // ---------------------------------------------------------------------------
 // Main render function
 // ---------------------------------------------------------------------------
@@ -92,19 +145,11 @@ export function renderSession(
           onBreak, currentBreakS, breakCategory, suggestedBreakS,
           zen, displayStyle, time } = state;
 
-  // -- Top lines (goal/label) -----------------------------------------------
-  // The goal sits CENTERED above the counter; hidden entirely in zen mode.
-  const topLines: string[] = [];
-  const goalText = goal ?? label;
-  if (goalText && !zen) {
-    const text = color ? paint(goalText, theme, true) : goalText;
-    topLines.push(padTo(text, innerW, "center"));
-  }
-
   // -- Bottom lines (progress / break metadata) -----------------------------
   // CENTERED below the counter; suppressed entirely in zen mode. The control
   // hints live ONLY in the dashboard's global footer (app.ts) — the panel no
   // longer renders its own footer, so the two never duplicate.
+  const goalText = goal ?? label;
   const bottomLines: string[] = [];
 
   if (!zen) {
@@ -140,39 +185,49 @@ export function renderSession(
     }
   }
 
-  // -- Counter scaling: RESERVE-FIRST ---------------------------------------
+  // -- Counter scaling: RESERVE-FIRST, with graceful degradation ------------
+  // Plan how the counter fits the available rows: keep the requested style if it
+  // fits, else drop the goal line, else fall back from a tall (9-row) font to
+  // the 5-row block font, and only collapse to a single text line as a last
+  // resort. This prevents the classic/bold fonts from collapsing in a minimized
+  // window that is also showing session metadata.
+  const hasGoal = !!goalText && !zen;
+  const plan = planCounter(innerW, innerH, time, displayStyle, hasGoal, bottomLines.length);
+
+  // -- Top line (goal/label) — CENTERED above the counter, kept only if the
+  //    plan made room for it (dropped first when vertical space is tight).
+  const topLines: string[] = [];
+  if (plan.showGoal && goalText) {
+    const text = color ? paint(goalText, theme, true) : goalText;
+    topLines.push(padTo(text, innerW, "center"));
+  }
+
   // Reserve space for top and bottom sections first, then scale the counter
-  // into what remains. This is the critical guarantee that the counter does
-  // NOT overshadow the metadata/footer.
+  // into what remains — the guarantee that the counter never overshadows the
+  // metadata.
   const topGap = topLines.length > 0 ? 1 : 0;       // blank row after top lines
   const bottomGap = bottomLines.length > 0 ? 1 : 0;  // blank row before bottom lines
   const reserved = topLines.length + topGap + bottomLines.length + bottomGap;
-  const counterAreaRows = Math.max(styleBaseRows(displayStyle), innerH - reserved);
-
-  // Determine whether the counter fits even at scale=1 (style-aware: the tall
-  // classic/bold fonts need more rows than block/simple/outline).
-  const fitsAtScaleOne =
-    innerW >= styleWidth(displayStyle, time, 1) &&
-    innerH - reserved >= styleBaseRows(displayStyle);
 
   let counterLines: string[];
 
-  if (!fitsAtScaleOne) {
-    // Panel is too small for the block font — fall back to a single centered
+  if (plan.style === "text") {
+    // Panel is too small for any glyph font — fall back to a single centered
     // text line so tiny panels still display the clock.
     const raw = padTo(time, innerW, "center");
     const line = color ? `${THEME_FG[theme]}${raw}${RESET}` : raw;
     counterLines = [line];
   } else {
-    const scale = computeSessionScale(innerW, counterAreaRows, time, { style: displayStyle });
+    const counterAreaRows = Math.max(styleBaseRows(plan.style), innerH - reserved);
+    const scale = computeSessionScale(innerW, counterAreaRows, time, { style: plan.style });
     // Every style shares the reserve-first scaling maths via style-aware metrics
     // (styleWidth / styleBaseRows); they differ only in glyph rendering:
-    //   "block"   solid block glyphs (default)
+    //   "block"   solid block glyphs (default; also the tall-font fallback)
     //   "simple"  clean heavy box-drawing seven-segment line digits
-    //   "outline" hollow box-drawing line-art digits (distinct at every scale)
+    //   "outline" light box-drawing seven-segment line digits (scales cleanly)
     //   "classic" tall LIGHT solid terminal numerals
     //   "bold"    tall HEAVY solid terminal numerals
-    const rawLines = renderCounter(displayStyle, time, scale);
+    const rawLines = renderCounter(plan.style, time, scale);
     counterLines = rawLines.map((line) => {
       const padded = padTo(line, innerW, "center");
       return color ? `${THEME_FG[theme]}${padded}${RESET}` : padded;

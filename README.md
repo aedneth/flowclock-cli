@@ -126,8 +126,9 @@ Ratio   1:4.3 focus:rest
   - **`block`** (default) — solid 7-segment glyphs.
   - **`simple`** — clean heavy **line** digits in box-drawing strokes (`┏━┓ ┃
     ┣━┫ ┗━┛`). Minimal and airy, but full hero size.
-  - **`outline`** — a hollow, box-drawing **line-art** clock. Reads as a distinct
-    hollow glyph at **every** size — small, tiled, or maximised.
+  - **`outline`** — the same seven-segment skeleton as `simple` in **light**
+    strokes (`┌─┐ │`): a distinct airy/hollow clock that stays crisp at **every**
+    size — small, tiled, or maximised.
   - **`classic`** — tall, solid, **terminal-style numerals** that recreate a
     familiar monospace clock (light weight).
   - **`bold`** — the `classic` letterforms with heavier strokes.
@@ -243,10 +244,11 @@ The Session counter has five looks, all using the **same reserve-first scaling**
 so they stay prominent without overshadowing the metadata:
 
 - **`block`** (default) — solid 7-segment glyphs.
-- **`simple`** — clean heavy **line** digits in box-drawing strokes; minimal but
-  full hero size.
-- **`outline`** — a hollow, box-drawing **line-art** clock; a distinct hollow
-  glyph at every size (small, tiled, or maximised).
+- **`simple`** — clean **heavy** line digits in box-drawing strokes (`┏━┓ ┃`);
+  minimal but full hero size.
+- **`outline`** — the same seven-segment skeleton in **light** strokes (`┌─┐ │`),
+  a distinct airy/hollow clock that stays crisp at every size (small, tiled, or
+  maximised).
 - **`classic`** — tall, solid, **terminal-style numerals** (light weight) — a
   familiar monospace clock.
 - **`bold`** — the `classic` letterforms with heavier strokes.
@@ -420,6 +422,7 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v3.1.0** ✅ | In-dashboard new-session form (goal/name/target/break); live + persisted display-style (`d`) and theme (`t`) toggles; scaled minimal `simple` style (shares `block`'s scaling) |
 | **v3.2.0** ✅ | `simple` reworked into a clean line font; `outline` added as a third selectable style; display-style toggle fixed on small/tiled windows |
 | **v3.3.0** ✅ | `classic` + `bold` terminal-style counter fonts; `outline` rewritten as clean line-art (fixes small/medium rendering); centered session layout; `z` zen + `Enter` hide-controls; delete a session from the dashboard (confirm modal); deduped controls footer |
+| **v3.3.1** ✅ | `outline` redrawn as a light seven-segment font (no more garbling at large scale); `classic`/`bold` degrade gracefully (drop goal line → block font) instead of collapsing to a text clock in a minimized window with metadata |
 | **next** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 
