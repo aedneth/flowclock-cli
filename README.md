@@ -126,9 +126,10 @@ Ratio   1:4.3 focus:rest
   - **`block`** (default) — solid 7-segment glyphs.
   - **`simple`** — clean **heavy** line digits in box-drawing strokes (`┏━┓ ┃
     ┣━┫ ┗━┛`). Minimal and airy, but full hero size.
-  - **`outline`** — hollow **silhouette** of the block font: each digit is a
-    distinctive double-walled nested-rectangle drawn in box-drawing characters.
-    A bold hollow look, distinct from the line fonts.
+  - **`outline`** — hollow **silhouette** of the block font rendered in
+    **DOUBLE-LINE** box-drawing characters (`╔═╗ ║ ╚╝`): each digit is a
+    distinctive double-walled nested-rectangle. Visually distinct from
+    `minimal` at every scale, including scale 1 (minimized windows).
   - **`minimal`** — clean **light** line digits in box-drawing strokes (`┌─┐ │
     └─┘`, airy `○` colon). Scales crisply at every size.
   - **`classic`** — tall, solid, **terminal-style numerals** that recreate a
@@ -140,10 +141,10 @@ Ratio   1:4.3 focus:rest
 
   ```
   block            simple           outline
-  ████  ████       ┏━━┓ ┏━━┓        ┌──┐ ┌──┐
-  █  █  █  █       ┃  ┃ ┃  ┃        │  │ │  │
-  █  █  █  █       ┃  ┃ ┃  ┃        │  │ │  │
-  ████  ████       ┗━━┛ ┗━━┛        └──┘ └──┘
+  ████  ████       ┏━━┓ ┏━━┓        ╔══╗ ╔══╗
+  █  █  █  █       ┃  ┃ ┃  ┃        ║  ║ ║  ║
+  █  █  █  █       ┃  ┃ ┃  ┃        ║  ║ ║  ║
+  ████  ████       ┗━━┛ ┗━━┛        ╚══╝ ╚══╝
 
   minimal          classic               bold
   ┌──┐ ┌──┐         ███   ███            ████  ████
@@ -248,9 +249,10 @@ so they stay prominent without overshadowing the metadata:
 - **`block`** (default) — solid 7-segment glyphs.
 - **`simple`** — clean **heavy** line digits in box-drawing strokes (`┏━┓ ┃`);
   minimal but full hero size.
-- **`outline`** — hollow **silhouette** of the block font drawn in box-drawing
-  characters: each digit is a distinctive double-walled nested-rectangle. A bold
-  hollow look that stays crisp at every size.
+- **`outline`** — hollow **silhouette** of the block font rendered in
+  **DOUBLE-LINE** box-drawing characters (`╔═╗ ║ ╚╝`): each digit is a
+  distinctive double-walled nested-rectangle. Visually distinct from `minimal`
+  at every scale (including scale 1 / minimized windows).
 - **`minimal`** — clean **light** line digits in box-drawing strokes (`┌─┐ │`),
   airy `○` colon. Scales crisply at every size; lighter feel than `simple`.
 - **`classic`** — tall, solid, **terminal-style numerals** (light weight) — a
@@ -397,7 +399,7 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `theme` | `neon` | `neon` · `amber` · `blue` · `mono` |
-| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, `outline` hollow silhouette double-wall, `minimal` light line digits, `classic` tall solid terminal numerals, or `bold` heavier — all same reserve-first scaling; cycle live with `d` |
+| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, `outline` hollow silhouette in double-line chars (`╔═╗`) distinct from `minimal`, `minimal` light line digits, `classic` tall solid terminal numerals, or `bold` heavier — all same reserve-first scaling; cycle live with `d` |
 | `showControls` | `true` | show the controls footer (`--zen` overrides) |
 | `dailyFocusGoalS` | `14400` | daily focus goal in seconds (drives maximization %) |
 | `keybindings.{pause,break,category,reset,quit}` | `p` `b` `c` `r` `q` | in-session keys |
@@ -429,6 +431,7 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v3.3.0** ✅ | `classic` + `bold` terminal-style counter fonts; `outline` rewritten as clean line-art (fixes small/medium rendering); centered session layout; `z` zen + `Enter` hide-controls; delete a session from the dashboard (confirm modal); deduped controls footer |
 | **v3.3.1** ✅ | `outline` redrawn as a light seven-segment font (no more garbling at large scale); `classic`/`bold` degrade gracefully (drop goal line → block font) instead of collapsing to a text clock in a minimized window with metadata |
 | **v3.4.0** ✅ | restored the original silhouette `outline` style (hollow double-wall nested-rectangle); added `minimal` (light seven-segment line font); uniform counter scaling so `classic`/`bold` no longer tower over the 5-row fonts in minimized/zen windows |
+| **v3.4.1** ✅ | `outline` double-line box-drawing chars (`╔═╗`) — distinct from `minimal` at every scale; uniform `classic`/`bold` footprint — height capped to 5-row reference, degrades to `block` in short windows |
 | **next** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 

@@ -10,7 +10,7 @@ export type ThemeName = z.infer<typeof ThemeNameSchema>;
  * HUD / counter display style:
  *  - "block"   solid block glyphs (default)
  *  - "simple"  clean heavy box-drawing seven-segment digits
- *  - "outline" hollow box-drawing silhouette glyphs (double-walled line-art)
+ *  - "outline" hollow DOUBLE-LINE silhouette glyphs (╔═╗ ║ ╚╝ — distinct at every scale)
  *  - "minimal" clean light box-drawing seven-segment digits (airy line font)
  *  - "classic" tall solid terminal-style numerals (light weight)
  *  - "bold"    tall solid terminal-style numerals (heavy weight)

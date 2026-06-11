@@ -580,3 +580,123 @@ describe("renderSession — classic/bold no longer tower over block in half/mini
     expect(Math.abs(classicCount - blockCount)).toBeLessThanOrEqual(3);
   });
 });
+
+// ---------------------------------------------------------------------------
+// v3.4.1 — uniform footprint + consistent goal (Bug 1 + Bug 2 regression guards)
+// ---------------------------------------------------------------------------
+
+describe("v3.4.1 — uniform footprint + consistent goal", () => {
+  // State used for all sub-tests: active session with goal, focus target, and
+  // break budget, no zen mode.
+  const state34 = (style: SessionViewState["displayStyle"]): SessionViewState =>
+    activeState({
+      displayStyle: style,
+      active: true,
+      goal: "Deep work",
+      focusTargetS: 1200,
+      breakBudgetS: 300,
+      zen: false,
+    });
+
+  /**
+   * Count rows that contain counter-glyph characters (solid block or double-line
+   * box-drawing) but are NOT metadata or goal lines.
+   * We use █ (present in block/classic/bold) as the counter signal for solid-font
+   * styles. This function is intentionally scoped to solid (█) styles so it
+   * remains unambiguous even in panels with box-drawing borders.
+   */
+  const solidCounterRows = (rows: string[]): number =>
+    rows
+      .map(strip)
+      .filter(
+        (r) =>
+          /█/.test(r) &&
+          !/focus|break|ratio|Session|Deep work/.test(r),
+      ).length;
+
+  // ── Test A: classic/bold never taller than the line fonts in a TIGHT window ──
+
+  it("Test A — classic: counter rows never exceed block/simple/outline/minimal in a tight 92×17 window", () => {
+    const w = 92, h = 17;
+    const r = rect(w, h);
+
+    const lineStyles = ["block", "simple", "outline", "minimal"] as const;
+    const lineCounts = lineStyles.map((s) =>
+      solidCounterRows(renderSession(state34(s), r, "neon", false)),
+    );
+    const maxLineCount = Math.max(...lineCounts);
+
+    const classicCount = solidCounterRows(
+      renderSession(state34("classic"), r, "neon", false),
+    );
+    // In a tight window classic falls back to block; its height must not exceed
+    // the tallest line-font counter in the same window.
+    expect(classicCount).toBeLessThanOrEqual(maxLineCount);
+  });
+
+  it("Test A — bold: counter rows never exceed block/simple/outline/minimal in a tight 92×17 window", () => {
+    const w = 92, h = 17;
+    const r = rect(w, h);
+
+    const lineStyles = ["block", "simple", "outline", "minimal"] as const;
+    const lineCounts = lineStyles.map((s) =>
+      solidCounterRows(renderSession(state34(s), r, "neon", false)),
+    );
+    const maxLineCount = Math.max(...lineCounts);
+
+    const boldCount = solidCounterRows(
+      renderSession(state34("bold"), r, "neon", false),
+    );
+    expect(boldCount).toBeLessThanOrEqual(maxLineCount);
+  });
+
+  // ── Test B: goal shown consistently across ALL six styles ──
+
+  it("Test B — goal 'Deep work' is present for all six styles in a tight 92×17 window", () => {
+    const w = 92, h = 17;
+    const r = rect(w, h);
+    for (const style of ["block", "simple", "outline", "minimal", "classic", "bold"] as const) {
+      const joined = renderSession(state34(style), r, "neon", false).map(strip).join("\n");
+      expect(joined, `goal missing for style "${style}"`).toContain("Deep work");
+    }
+  });
+
+  // ── Test C: outline shows double-line chars; minimal uses single-line only ──
+
+  it("Test C — outline renders double-line box-drawing chars (╔/║/╚) that minimal never does", () => {
+    const w = 92, h = 17;
+    const r = rect(w, h);
+
+    // Strip ANSI but NOT the box-drawing characters themselves.
+    const outlineJoined = renderSession(state34("outline"), r, "neon", false)
+      .map(strip)
+      .join("\n");
+    const minimalJoined = renderSession(state34("minimal"), r, "neon", false)
+      .map(strip)
+      .join("\n");
+
+    // Outline counter must contain at least one double-line char.
+    expect(/[╔║╚╗╝═]/.test(outlineJoined)).toBe(true);
+    // Minimal counter must NOT contain any double-line chars.
+    expect(/[╔║╚╗╝═]/.test(minimalJoined)).toBe(false);
+  });
+
+  // ── Test D: roomy window preserves tall identity for classic ──
+
+  it("Test D — classic keeps tall identity (> 5 glyph rows) in a roomy 92×28 window, goal + % are present", () => {
+    const w = 92, h = 28;
+    const r = rect(w, h);
+
+    const rows = renderSession(state34("classic"), r, "neon", false);
+    const stripped = rows.map(strip);
+    const joined = stripped.join("\n");
+
+    // At 92×28 classic should remain as a tall font with more than 5 solid rows.
+    const glyphRowCount = solidCounterRows(rows);
+    expect(glyphRowCount).toBeGreaterThan(5);
+
+    // Goal and focus-% metadata must both survive alongside the tall counter.
+    expect(joined).toContain("Deep work");
+    expect(joined).toContain("%");
+  });
+});

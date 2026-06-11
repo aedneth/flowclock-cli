@@ -162,7 +162,20 @@ describe("renderOutlineLines (hollow / outline style)", () => {
   it("draws box-drawing line-art, never solid blocks", () => {
     const joined = renderOutlineLines("12:34:56", 2).join("");
     expect(joined).not.toContain("█");
-    expect(/[─│┌┐└┘▫]/.test(joined)).toBe(true);
+    // v3.4.1: outline now uses DOUBLE-LINE box-drawing chars (╔═╗ ║ ╚╝)
+    expect(/[═║╔╗╚╝▫]/.test(joined)).toBe(true);
+  });
+
+  it("v3.4.1 — outline is DISTINCT from minimal at scale 1 (double-line vs light single-line)", () => {
+    // Bug 1 regression guard: the old single-line outline was byte-identical to
+    // the `minimal` font at scale 1, making the two styles indistinguishable in
+    // a minimized window. Double-line chars fix this at every scale.
+    const outlineJoined = renderOutlineLines("12:34:56", 1).join("\n");
+    const minimalJoined = renderMinimalLines("12:34:56", 1).join("\n");
+    expect(outlineJoined).not.toBe(minimalJoined);
+    // Outline must contain at least one double-line char that minimal never has.
+    expect(/[═║╔╗╚╝]/.test(outlineJoined)).toBe(true);
+    expect(/[═║╔╗╚╝]/.test(minimalJoined)).toBe(false);
   });
 
   it("is visually DISTINCT from block at scale 1 (fixes the small-window toggle)", () => {
@@ -392,5 +405,19 @@ describe("uniformCounterScale — consistent footprint across styles", () => {
     for (const style of ["block", "simple", "outline", "minimal", "classic", "bold"] as const) {
       expect(uniformCounterScale(10, 4, "00:00:00", style)).toBeGreaterThanOrEqual(1);
     }
+  });
+
+  it("v3.4.1 — floor semantics: classic height never exceeds block reference height at cols=120, rows=30", () => {
+    // At 120×30 the block reference reaches scale 3 (height 15).
+    // Math.floor(15 / 9) = 1, so classic is capped at scale 1 (height 9).
+    // Math.round would give round(15/9)=round(1.67)=2 (height 18 — would tower).
+    const cols = 120, rows = 30, time = "00:00:00";
+    const blockRef = computeSessionScale(cols, rows, time, { style: "block" });
+    expect(blockRef).toBe(3); // confirm block reaches scale 3 here
+
+    const refHeight = blockRef * 5; // 5-row block reference height = 15
+    const classicScale = uniformCounterScale(cols, rows, time, "classic");
+    // floor semantics: classic height must NOT exceed block reference height
+    expect(classicScale * 9).toBeLessThanOrEqual(refHeight);
   });
 });
