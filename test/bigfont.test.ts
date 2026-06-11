@@ -286,17 +286,49 @@ describe("renderMinimalLines (light seven-segment style)", () => {
   });
 });
 
-describe("renderClassicLines / renderBoldLines (tall solid terminal fonts)", () => {
-  it("classic is 9 rows tall at scale 1 and scales the row count by scale", () => {
-    expect(renderClassicLines("12:34:56", 1)).toHaveLength(9);
-    expect(renderClassicLines("0", 3)).toHaveLength(27);
-    expect(styleBaseRows("classic")).toBe(9);
+// ---------------------------------------------------------------------------
+// renderClassicLines / renderBoldLines — 5-row shade-weight variants of block
+//
+// These are NO LONGER tall 9-row terminal fonts. They share the exact 5-row ×
+// 4-col block footprint and differ only by inking filled cells with ▒ (classic)
+// or ▓ (bold) rather than █.
+// ---------------------------------------------------------------------------
+
+describe("renderClassicLines / renderBoldLines (5-row shade-weight variants of block)", () => {
+  it("classic is 5 rows tall at scale 1 — same as block (styleBaseRows == BIG_ROWS)", () => {
+    expect(renderClassicLines("12:34:56", 1)).toHaveLength(BIG_ROWS);
+    expect(renderClassicLines("0", 3)).toHaveLength(BIG_ROWS * 3);
+    expect(styleBaseRows("classic")).toBe(BIG_ROWS);
+    expect(styleBaseRows("classic")).toBe(styleBaseRows("block"));
   });
 
-  it("bold is 9 rows tall at scale 1 and scales the row count by scale", () => {
-    expect(renderBoldLines("12:34:56", 1)).toHaveLength(9);
-    expect(renderBoldLines("0", 2)).toHaveLength(18);
-    expect(styleBaseRows("bold")).toBe(9);
+  it("bold is 5 rows tall at scale 1 — same as block (styleBaseRows == BIG_ROWS)", () => {
+    expect(renderBoldLines("12:34:56", 1)).toHaveLength(BIG_ROWS);
+    expect(renderBoldLines("0", 2)).toHaveLength(BIG_ROWS * 2);
+    expect(styleBaseRows("bold")).toBe(BIG_ROWS);
+    expect(styleBaseRows("bold")).toBe(styleBaseRows("block"));
+  });
+
+  it("styleWidth for classic and bold equals styleWidth for block (same footprint)", () => {
+    const t = "12:34:56";
+    for (const scale of [1, 2, 3]) {
+      expect(styleWidth("classic", t, scale)).toBe(styleWidth("block", t, scale));
+      expect(styleWidth("bold", t, scale)).toBe(styleWidth("block", t, scale));
+    }
+  });
+
+  it("classic row count equals block row count at scales 1, 2, 3", () => {
+    const t = "12:34:56";
+    for (const scale of [1, 2, 3]) {
+      expect(renderClassicLines(t, scale).length).toBe(renderBigLines(t, scale).length);
+    }
+  });
+
+  it("bold row count equals block row count at scales 1, 2, 3", () => {
+    const t = "12:34:56";
+    for (const scale of [1, 2, 3]) {
+      expect(renderBoldLines(t, scale).length).toBe(renderBigLines(t, scale).length);
+    }
   });
 
   it("rendered width exactly matches styleWidth (parity for reserve-first maths)", () => {
@@ -311,34 +343,67 @@ describe("renderClassicLines / renderBoldLines (tall solid terminal fonts)", () 
     }
   });
 
-  it("uses solid block characters, no box-drawing line art", () => {
+  it("classic inks with ▒ (not █), bold inks with ▓ (not █)", () => {
     const c = renderClassicLines("8", 2).join("");
-    expect(c).toContain("█");
+    expect(c).toContain("▒");
+    expect(c).not.toContain("█");
     expect(/[─│┌┐└┘┃━]/.test(c)).toBe(false);
+
     const b = renderBoldLines("8", 2).join("");
-    expect(b).toContain("█");
+    expect(b).toContain("▓");
+    expect(b).not.toContain("█");
   });
 
-  it("bold is heavier than classic (more ink for the same time)", () => {
-    const ink = (rows: string[]) => rows.join("").replace(/ /g, "").length;
-    expect(ink(renderBoldLines("12:34:56", 1))).toBeGreaterThan(ink(renderClassicLines("12:34:56", 1)));
+  it("classic line[i] == block line[i] with █→▒ at scale 1 (exact geometry reuse)", () => {
+    const t = "12:34:56";
+    const blockLines = renderBigLines(t, 1);
+    const classicLines = renderClassicLines(t, 1);
+    blockLines.forEach((blockLine, i) => {
+      expect(classicLines[i]).toBe(blockLine.replaceAll("█", "▒"));
+    });
   });
 
-  it("classic and bold are visually distinct from block, simple, outline", () => {
-    const samples = ["12:34:56"] as const;
-    for (const t of samples) {
-      const classic = renderClassicLines(t, 2).join("\n");
-      const bold = renderBoldLines(t, 2).join("\n");
-      expect(classic).not.toBe(bold);
-      // distinct dimensions from the 5-row families guarantees distinctness
-      expect(renderClassicLines(t, 1).length).not.toBe(renderBigLines(t, 1).length);
-    }
+  it("classic line[i] == block line[i] with █→▒ at scale 2 (geometry reuse at scale 2)", () => {
+    const t = "12:34:56";
+    const blockLines = renderBigLines(t, 2);
+    const classicLines = renderClassicLines(t, 2);
+    blockLines.forEach((blockLine, i) => {
+      expect(classicLines[i]).toBe(blockLine.replaceAll("█", "▒"));
+    });
+  });
+
+  it("bold line[i] == block line[i] with █→▓ at scale 1 (exact geometry reuse)", () => {
+    const t = "12:34:56";
+    const blockLines = renderBigLines(t, 1);
+    const boldLines = renderBoldLines(t, 1);
+    blockLines.forEach((blockLine, i) => {
+      expect(boldLines[i]).toBe(blockLine.replaceAll("█", "▓"));
+    });
+  });
+
+  it("bold line[i] == block line[i] with █→▓ at scale 2 (geometry reuse at scale 2)", () => {
+    const t = "12:34:56";
+    const blockLines = renderBigLines(t, 2);
+    const boldLines = renderBoldLines(t, 2);
+    blockLines.forEach((blockLine, i) => {
+      expect(boldLines[i]).toBe(blockLine.replaceAll("█", "▓"));
+    });
+  });
+
+  it("classic and bold are visually distinct from block and from each other", () => {
+    const t = "12:34:56";
+    const classic = renderClassicLines(t, 1).join("\n");
+    const bold = renderBoldLines(t, 1).join("\n");
+    const block = renderBigLines(t, 1).join("\n");
+    expect(classic).not.toBe(bold);
+    expect(classic).not.toBe(block);
+    expect(bold).not.toBe(block);
   });
 
   it("never throws on unexpected characters", () => {
     expect(() => renderClassicLines("ab", 2)).not.toThrow();
     expect(() => renderBoldLines("??", 3)).not.toThrow();
-    expect(renderClassicLines("?")).toHaveLength(9);
+    expect(renderClassicLines("?")).toHaveLength(BIG_ROWS);
   });
 });
 
@@ -359,12 +424,15 @@ describe("computeSessionScale — style-aware", () => {
     expect(styleWidth("block", "00:00:00", 1)).toBe(bigWidth("00:00:00", 1));
   });
 
-  it("tall classic font yields a smaller scale than block in the same area", () => {
-    // 9-row classic needs more vertical room per scale step than 5-row block.
+  it("classic and bold yield the SAME scale as block — all share the 5-row footprint", () => {
+    // All styles now share the identical 5-row × 4-col footprint, so
+    // computeSessionScale must return the same value for block, classic, and bold.
     const area = { c: 120, r: 24 } as const;
     const blockScale = computeSessionScale(area.c, area.r, "00:00:00", { style: "block" });
     const classicScale = computeSessionScale(area.c, area.r, "00:00:00", { style: "classic" });
-    expect(classicScale).toBeLessThanOrEqual(blockScale);
+    const boldScale = computeSessionScale(area.c, area.r, "00:00:00", { style: "bold" });
+    expect(classicScale).toBe(blockScale);
+    expect(boldScale).toBe(blockScale);
   });
 
   it("still returns >= 1 for every style on a tiny area", () => {
@@ -375,30 +443,26 @@ describe("computeSessionScale — style-aware", () => {
 });
 
 describe("uniformCounterScale — consistent footprint across styles", () => {
-  it("5-row styles return the same scale as computeSessionScale (block reference)", () => {
+  it("all styles return the same scale as computeSessionScale (all share 5-row footprint)", () => {
     const time = "00:00:00";
     for (const area of [{ c: 98, r: 23 }, { c: 120, r: 31 }] as const) {
-      for (const style of ["block", "simple", "outline", "minimal"] as const) {
+      for (const style of ["block", "simple", "outline", "minimal", "classic", "bold"] as const) {
         const expected = computeSessionScale(area.c, area.r, time, { style });
         expect(uniformCounterScale(area.c, area.r, time, style)).toBe(expected);
       }
     }
   });
 
-  it("tall fonts do NOT tower: classic returns smaller scale than independent computeSessionScale in a half-window", () => {
-    // At cols=98, rows=23, time="00:29:35" the block font renders at scale 2 (height 10).
-    // The OLD independent classic scale would be 2 (height 18 — towering).
-    // uniformCounterScale caps it to scale 1 (height 9) which fits the block reference.
+  it("classic and bold return the SAME scale as block (no tall-font taming needed)", () => {
+    // uniformCounterScale is now a thin wrapper over computeSessionScale.
+    // Because all styles share the 5-row footprint, classic and bold get the
+    // same scale as block — no floor() taming is applied.
     const cols = 98, rows = 23, time = "00:29:35";
-    const blockRef = computeSessionScale(cols, rows, time, { style: "block" });
-    expect(blockRef).toBe(2); // confirm the reference is scale 2
-
-    const oldClassic = computeSessionScale(cols, rows, time, { style: "classic" });
-    const uniformClassic = uniformCounterScale(cols, rows, time, "classic");
-    // uniform should be less than the OLD independent scale (which would tower)
-    expect(uniformClassic).toBeLessThan(oldClassic);
-    // and the rendered height must not wildly exceed the block reference height
-    expect(uniformClassic * 9).toBeLessThanOrEqual(blockRef * 5 + 9);
+    const blockScale = uniformCounterScale(cols, rows, time, "block");
+    const classicScale = uniformCounterScale(cols, rows, time, "classic");
+    const boldScale = uniformCounterScale(cols, rows, time, "bold");
+    expect(classicScale).toBe(blockScale);
+    expect(boldScale).toBe(blockScale);
   });
 
   it("returns >= 1 for every style on a tiny area", () => {
@@ -407,17 +471,14 @@ describe("uniformCounterScale — consistent footprint across styles", () => {
     }
   });
 
-  it("v3.4.1 — floor semantics: classic height never exceeds block reference height at cols=120, rows=30", () => {
-    // At 120×30 the block reference reaches scale 3 (height 15).
-    // Math.floor(15 / 9) = 1, so classic is capped at scale 1 (height 9).
-    // Math.round would give round(15/9)=round(1.67)=2 (height 18 — would tower).
+  it("v3.5 — classic and bold now equal block at cols=120, rows=30 (unified footprint)", () => {
+    // The old v3.4.1 floor() taming that kept classic at scale 1 when block was
+    // at scale 3 is gone. Now both are at scale 3.
     const cols = 120, rows = 30, time = "00:00:00";
-    const blockRef = computeSessionScale(cols, rows, time, { style: "block" });
-    expect(blockRef).toBe(3); // confirm block reaches scale 3 here
-
-    const refHeight = blockRef * 5; // 5-row block reference height = 15
+    const blockScale = uniformCounterScale(cols, rows, time, "block");
     const classicScale = uniformCounterScale(cols, rows, time, "classic");
-    // floor semantics: classic height must NOT exceed block reference height
-    expect(classicScale * 9).toBeLessThanOrEqual(refHeight);
+    const boldScale = uniformCounterScale(cols, rows, time, "bold");
+    expect(classicScale).toBe(blockScale);
+    expect(boldScale).toBe(blockScale);
   });
 });

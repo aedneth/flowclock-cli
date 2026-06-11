@@ -20,7 +20,6 @@ import {
   renderCounter,
   styleWidth,
   styleBaseRows,
-  computeSessionScale,
   uniformCounterScale,
 } from "../../lib/bigfont.js";
 import type { DisplayStyle } from "../../schemas/config.js";
@@ -73,22 +72,19 @@ interface CounterPlan {
 
 /**
  * Decide how to fit the counter into the available rows — the graceful
- * degradation ladder that keeps a real glyph clock on screen far longer:
+ * degradation ladder that keeps a real glyph clock on screen as long as possible:
  *
- *   1. requested style, but a tall (9-row) font is used ONLY while it stays
- *      within the 5-row block reference's footprint (so it never towers over
- *      the line fonts or crowds the goal); keeping the goal line;
+ *   1. requested style, keeping the goal line;
  *   2. requested style, with the goal line DROPPED to reclaim two rows;
- *   3. tall fonts (classic/bold) that would tower — or don't fit — fall back to
- *      the 5-row `block` font, keeping then dropping the goal, so the counter's
- *      footprint stays uniform across every style;
- *   4. only when even a 5-row font cannot fit do we collapse to the single
+ *   3. only when even a glyph font cannot fit do we collapse to the single
  *      centered text line.
  *
- * The footprint gate is the key to a consistent size across styles: a 9-row
- * font cannot occupy the same 5 rows as the line fonts, so in a window too short
- * to render it without dwarfing them, classic/bold degrade to block. In roomier
- * windows they keep their tall identity at a height that matches block.
+ * EVERY style now shares the exact 5-row × 4-col `block` footprint (`classic`/
+ * `bold` are shade-weight variants of block, not the old taller letterforms), so
+ * the requested style renders at every window size the others do. There is no
+ * tall-font case and no fall-back to a different style: cycling styles never
+ * changes the counter's footprint, and classic/bold are never silently swapped
+ * for block in a tight window.
  */
 function planCounter(
   innerW: number,
@@ -104,38 +100,11 @@ function planCounter(
   const fits = (st: DisplayStyle, gr: number): boolean =>
     innerW >= styleWidth(st, time, 1) && availRows(gr) >= styleBaseRows(st);
 
-  const isTall = styleBaseRows(style) > styleBaseRows("block");
+  // 1-2: keep the requested style; keep the goal if it fits, else drop it.
+  if (fits(style, goalRows)) return { style, showGoal: hasGoal };
+  if (hasGoal && fits(style, 0)) return { style, showGoal: false };
 
-  // A tall (9-row) font keeps its footprint only if the 5-row block reference
-  // would render at least as tall in the same area — i.e. there is room for the
-  // tall font to sit at/below block's height rather than towering over it.
-  const tallKeepsFootprint = (gr: number): boolean => {
-    if (!fits(style, gr)) return false;
-    const blockH =
-      computeSessionScale(innerW, Math.max(1, availRows(gr)), time, { style: "block" }) *
-      styleBaseRows("block");
-    return blockH >= styleBaseRows(style);
-  };
-
-  if (!isTall) {
-    // 1-2: a 5-row style — keep the goal if it fits, else drop it.
-    if (fits(style, goalRows)) return { style, showGoal: hasGoal };
-    if (hasGoal && fits(style, 0)) return { style, showGoal: false };
-  } else {
-    // 1: a tall style — kept ONLY while it fits WITH the goal and stays within
-    //    the block footprint. We deliberately do NOT drop the goal to squeeze a
-    //    tall font in: the line fonts keep the goal at this size, so dropping it
-    //    for classic/bold would make the counter both taller AND goal-less than
-    //    every other style. Falling back to block (below) keeps the goal.
-    if (tallKeepsFootprint(goalRows)) return { style, showGoal: hasGoal };
-    // 2-3: it would tower (or not fit with the goal) → fall back to the 5-row
-    //      block font — keeping then dropping the goal exactly as the line fonts
-    //      would — so the footprint and goal stay uniform across every style.
-    if (fits("block", goalRows)) return { style: "block", showGoal: hasGoal };
-    if (hasGoal && fits("block", 0)) return { style: "block", showGoal: false };
-  }
-
-  // 5: last resort — single centered text line. Keep the goal only if there is
+  // 3: last resort — single centered text line. Keep the goal only if there is
   // still a row for the clock after the goal + metadata.
   return { style: "text", showGoal: hasGoal && availRows(goalRows) >= 1 };
 }
@@ -212,10 +181,10 @@ export function renderSession(
 
   // -- Counter scaling: RESERVE-FIRST, with graceful degradation ------------
   // Plan how the counter fits the available rows: keep the requested style if it
-  // fits, else drop the goal line, else fall back from a tall (9-row) font to
-  // the 5-row block font, and only collapse to a single text line as a last
-  // resort. This prevents the classic/bold fonts from collapsing in a minimized
-  // window that is also showing session metadata.
+  // fits, else drop the goal line, and only collapse to a single text line as a
+  // last resort. Because every style shares block's 5-row footprint, the chosen
+  // style — including classic/bold — renders at its true glyphs in a minimized
+  // window with metadata, and is never silently swapped for a different style.
   const hasGoal = !!goalText && !zen;
   const plan = planCounter(innerW, innerH, time, displayStyle, hasGoal, bottomLines.length);
 
@@ -244,17 +213,18 @@ export function renderSession(
     counterLines = [line];
   } else {
     const counterAreaRows = Math.max(styleBaseRows(plan.style), innerH - reserved);
-    // Uniform scaling: every style targets the same rendered footprint as the
-    // 5-row block font, so cycling styles never makes the counter jump in size
-    // (the tall classic/bold fonts no longer tower over the line fonts).
+    // Uniform scaling: every style shares the 5-row × 4-col block footprint, so a
+    // single scale gives them all an identical rendered size — cycling styles
+    // never makes the counter jump in size.
     const scale = uniformCounterScale(innerW, counterAreaRows, time, plan.style);
     // Every style shares the reserve-first scaling maths via style-aware metrics
     // (styleWidth / styleBaseRows); they differ only in glyph rendering:
-    //   "block"   solid block glyphs (default; also the tall-font fallback)
+    //   "block"   solid full-block █ glyphs (default)
     //   "simple"  clean heavy box-drawing seven-segment line digits
-    //   "outline" light box-drawing seven-segment line digits (scales cleanly)
-    //   "classic" tall LIGHT solid terminal numerals
-    //   "bold"    tall HEAVY solid terminal numerals
+    //   "outline" double-line box-drawing silhouette digits
+    //   "minimal" light box-drawing seven-segment line digits
+    //   "classic" solid LIGHT shade ▒ terminal numerals
+    //   "bold"    solid HEAVY shade ▓ terminal numerals
     const rawLines = renderCounter(plan.style, time, scale);
     counterLines = rawLines.map((line) => {
       const padded = padTo(line, innerW, "center");

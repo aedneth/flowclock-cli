@@ -321,17 +321,13 @@ export function computeSessionScale(
 }
 
 /**
- * Pick a scale that gives every style a CONSISTENT rendered footprint, so the
- * counter does not jump in size when cycling display styles with `d`.
- *
- * The problem: the tall (9-row) `classic`/`bold` fonts, scaled independently to
- * fill the area, rendered ~1.8× taller than the 5-row fonts at the same window
- * size — towering over them and even crowding out the goal line. Here the 5-row
- * `block` font is the reference: we scale every style toward the SAME target
- * rendered height (block's), so all styles occupy roughly the same vertical
- * footprint. 5-row styles are unaffected (they already match block exactly);
- * the tall fonts pick the LARGEST integer scale whose height does not exceed
- * the reference, so they never overshoot the line fonts or crowd the goal line.
+ * Pick the counter scale for `style`. Every display style now shares the exact
+ * 5-row × 4-col `block` footprint (the tall 9-row `classic`/`bold` letterforms
+ * were retired in favour of 5-row shade weights — see STYLE_METRICS), so a
+ * single scale gives ALL styles an identical rendered size. Cycling styles with
+ * `d` therefore never makes the counter jump in size, and no style-specific
+ * "taming" is needed — this is now a thin, style-aware wrapper over
+ * `computeSessionScale` kept for a stable call site and clear intent.
  */
 export function uniformCounterScale(
   areaCols: number,
@@ -339,32 +335,20 @@ export function uniformCounterScale(
   time: string,
   style: DisplayStyle,
 ): number {
-  // Reference: how tall the 5-row block font renders in this area.
-  const refScale = computeSessionScale(areaCols, areaRows, time, { style: "block" });
-  const refHeight = refScale * styleBaseRows("block");
-
-  // Largest scale that physically fits this style in the area.
-  const natural = computeSessionScale(areaCols, areaRows, time, { style });
-
-  // 5-row styles already match the reference; only the tall fonts need taming.
-  if (styleBaseRows(style) === styleBaseRows("block")) return natural;
-
-  // Scale the tall font to the LARGEST integer height that does NOT exceed the
-  // reference (floor, not round) — so classic/bold never tower over the line
-  // fonts or crowd the goal line — then clamp to what actually fits the area.
-  const target = Math.max(1, Math.floor(refHeight / styleBaseRows(style)));
-  return Math.min(natural, target);
+  return computeSessionScale(areaCols, areaRows, time, { style });
 }
 
 // ---------------------------------------------------------------------------
-// Tall solid "classic" / "bold" fonts — terminal-style numerals
+// Solid shade-weight "classic" / "bold" fonts — terminal numerals
 // ---------------------------------------------------------------------------
 
 /**
- * Per-style glyph geometry. `block`/`simple`/`outline`/`minimal` share the
- * original 5-row, 4-wide-digit footprint; `classic`/`bold` are taller (9 rows)
- * solid letterforms. Threading these metrics through the scaling maths keeps the
- * reserve-first layout exact for every style.
+ * Per-style glyph geometry. EVERY style shares the original 5-row, 4-wide-digit,
+ * 1-wide-colon footprint, so the reserve-first scaling maths and small-panel
+ * fallback thresholds are byte-for-byte identical across all six styles. The
+ * styles differ only in how each filled cell is INKED (see `renderCounter`):
+ * `block` full `█`, `classic`/`bold` the lighter `▒` / heavier `▓` shade
+ * weights, and `simple`/`outline`/`minimal` box-drawing line-art.
  */
 interface StyleMetrics {
   rows: number;
@@ -377,8 +361,8 @@ const STYLE_METRICS: Record<DisplayStyle, StyleMetrics> = {
   simple:  { rows: BIG_ROWS, digitW: 4, colonW: 1 },
   outline: { rows: BIG_ROWS, digitW: 4, colonW: 1 },
   minimal: { rows: BIG_ROWS, digitW: 4, colonW: 1 },
-  classic: { rows: 9, digitW: 5, colonW: 1 },
-  bold:    { rows: 9, digitW: 6, colonW: 2 },
+  classic: { rows: BIG_ROWS, digitW: 4, colonW: 1 },
+  bold:    { rows: BIG_ROWS, digitW: 4, colonW: 1 },
 };
 
 /** Number of text rows the style occupies at scale 1. */
@@ -398,71 +382,30 @@ export function styleWidth(style: DisplayStyle, time: string, scale = 1): number
   return w * scale;
 }
 
-// 5-wide × 9-tall LIGHT letterforms (the `classic` style).
-const CLASSIC_GLYPHS: Record<string, string[]> = {
-  "0": [" ███ ", "█   █", "█   █", "█   █", "█   █", "█   █", "█   █", "█   █", " ███ "],
-  "1": ["  █  ", " ██  ", "  █  ", "  █  ", "  █  ", "  █  ", "  █  ", "  █  ", " ███ "],
-  "2": [" ███ ", "█   █", "    █", "    █", "   █ ", "  █  ", " █   ", "█    ", "█████"],
-  "3": [" ███ ", "█   █", "    █", "  ██ ", "    █", "    █", "    █", "█   █", " ███ "],
-  "4": ["   █ ", "  ██ ", " █ █ ", "█  █ ", "█████", "   █ ", "   █ ", "   █ ", "   █ "],
-  "5": ["█████", "█    ", "█    ", "████ ", "    █", "    █", "    █", "█   █", " ███ "],
-  "6": [" ███ ", "█   █", "█    ", "█    ", "████ ", "█   █", "█   █", "█   █", " ███ "],
-  "7": ["█████", "    █", "   █ ", "   █ ", "  █  ", "  █  ", " █   ", " █   ", " █   "],
-  "8": [" ███ ", "█   █", "█   █", "█   █", " ███ ", "█   █", "█   █", "█   █", " ███ "],
-  "9": [" ███ ", "█   █", "█   █", "█   █", " ████", "    █", "    █", "█   █", " ███ "],
-  ":": [" ", " ", "█", " ", " ", " ", "█", " ", " "],
-};
-
-// 6-wide × 9-tall HEAVY letterforms (the `bold` style).
-const BOLD_GLYPHS: Record<string, string[]> = {
-  "0": [" ████ ", "██  ██", "██  ██", "██  ██", "██  ██", "██  ██", "██  ██", "██  ██", " ████ "],
-  "1": ["  ██  ", " ███  ", "  ██  ", "  ██  ", "  ██  ", "  ██  ", "  ██  ", "  ██  ", " ████ "],
-  "2": [" ████ ", "██  ██", "    ██", "   ██ ", "  ██  ", " ██   ", "██    ", "██    ", "██████"],
-  "3": [" ████ ", "██  ██", "    ██", "  ███ ", "    ██", "    ██", "    ██", "██  ██", " ████ "],
-  "4": ["   ██ ", "  ███ ", " ████ ", "██ ██ ", "██████", "   ██ ", "   ██ ", "   ██ ", "   ██ "],
-  "5": ["██████", "██    ", "██    ", "█████ ", "    ██", "    ██", "    ██", "██  ██", " ████ "],
-  "6": [" ████ ", "██  ██", "██    ", "██    ", "█████ ", "██  ██", "██  ██", "██  ██", " ████ "],
-  "7": ["██████", "    ██", "   ██ ", "   ██ ", "  ██  ", "  ██  ", " ██   ", " ██   ", " ██   "],
-  "8": [" ████ ", "██  ██", "██  ██", "██  ██", " ████ ", "██  ██", "██  ██", "██  ██", " ████ "],
-  "9": [" ████ ", "██  ██", "██  ██", "██  ██", " █████", "    ██", "    ██", "██  ██", " ████ "],
-  ":": ["  ", "  ", "██", "██", "  ", "██", "██", "  ", "  "],
-};
+/** The shade glyph each solid weight inks its filled cells with. */
+const CLASSIC_FILL = "▒"; // light/medium shade — the `classic` weight
+const BOLD_FILL = "▓"; // heavy shade — the `bold` weight
 
 /**
- * Render a 9-row solid-letterform font (classic/bold) by integer cell-repeat —
- * crisp at every scale, no half-block artefacts. Width parity with
- * `styleWidth` is guaranteed by the glyph tables matching STYLE_METRICS.
+ * Render the solid `block` geometry with a different fill glyph. `classic` and
+ * `bold` are weight variants of the default `block` font: they share its EXACT
+ * 5-row × 4-col cell grid (so every dimension, scale step and layout reservation
+ * is byte-for-byte identical to block), and differ only by inking each filled
+ * cell with a lighter `▒` / heavier `▓` shade instead of the full `█`. Reusing
+ * `renderBigLines` guarantees the footprint can never drift from block's.
  */
-function renderTallSolid(
-  time: string,
-  scale: number,
-  glyphs: Record<string, string[]>,
-  rows: number,
-  digitW: number,
-): string[] {
-  const H = rows * scale;
-  const out = Array.from({ length: H }, () => "");
-  const chars = [...time];
-  const blank = Array.from({ length: rows }, () => " ".repeat(digitW));
-  chars.forEach((ch, idx) => {
-    const g = glyphs[ch] ?? blank;
-    const sep = idx < chars.length - 1 ? " ".repeat(scale) : "";
-    for (let r = 0; r < rows; r++) {
-      const line = [...(g[r] ?? "")].map((c) => c.repeat(scale)).join("");
-      for (let s = 0; s < scale; s++) out[r * scale + s] += line + sep;
-    }
-  });
-  return out;
+function renderShaded(time: string, scale: number, fill: string): string[] {
+  return renderBigLines(time, scale).map((line) => line.replaceAll("█", fill));
 }
 
-/** Render the `classic` style — tall LIGHT solid terminal numerals. */
+/** Render the `classic` style — solid LIGHT shade (`▒`) terminal numerals. */
 export function renderClassicLines(time: string, scale = 1): string[] {
-  return renderTallSolid(time, scale, CLASSIC_GLYPHS, STYLE_METRICS.classic.rows, STYLE_METRICS.classic.digitW);
+  return renderShaded(time, scale, CLASSIC_FILL);
 }
 
-/** Render the `bold` style — tall HEAVY solid terminal numerals. */
+/** Render the `bold` style — solid HEAVY shade (`▓`) terminal numerals. */
 export function renderBoldLines(time: string, scale = 1): string[] {
-  return renderTallSolid(time, scale, BOLD_GLYPHS, STYLE_METRICS.bold.rows, STYLE_METRICS.bold.digitW);
+  return renderShaded(time, scale, BOLD_FILL);
 }
 
 /** Render `time` in the requested display style at the given scale. */
