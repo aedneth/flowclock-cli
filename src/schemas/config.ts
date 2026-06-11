@@ -10,7 +10,8 @@ export type ThemeName = z.infer<typeof ThemeNameSchema>;
  * HUD / counter display style:
  *  - "block"   solid block glyphs (default)
  *  - "simple"  clean heavy box-drawing seven-segment digits
- *  - "outline" hollow box-drawing line-art glyphs
+ *  - "outline" hollow box-drawing silhouette glyphs (double-walled line-art)
+ *  - "minimal" clean light box-drawing seven-segment digits (airy line font)
  *  - "classic" tall solid terminal-style numerals (light weight)
  *  - "bold"    tall solid terminal-style numerals (heavy weight)
  */
@@ -18,6 +19,7 @@ export const DisplayStyleSchema = z.enum([
   "simple",
   "block",
   "outline",
+  "minimal",
   "classic",
   "bold",
 ]);
@@ -50,7 +52,7 @@ export const ConfigSchema = z.object({
   apiEndpoint: z.string().url().nullable().default(null),
   /** Optional big ASCII display (v0.3.0). */
   bigFont: z.boolean().default(false),
-  /** HUD display style: "block" (default), "simple" (line digits) or "outline". */
+  /** Counter display style: block (default) · simple · outline · minimal · classic · bold. */
   displayStyle: DisplayStyleSchema.default("block"),
   /** Whether to show the key-controls legend in the HUD. */
   showControls: z.boolean().default(true),

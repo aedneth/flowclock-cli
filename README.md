@@ -120,15 +120,17 @@ Ratio   1:4.3 focus:rest
 
 ## Display styles & themes
 
-- **`displayStyle`** — five looks for the big counter in the Session hero view,
+- **`displayStyle`** — six looks for the big counter in the Session hero view,
   all sharing the same reserve-first scaling. Cycle live in the dashboard with
   **`d`** (or `config set displayStyle …`):
   - **`block`** (default) — solid 7-segment glyphs.
-  - **`simple`** — clean heavy **line** digits in box-drawing strokes (`┏━┓ ┃
+  - **`simple`** — clean **heavy** line digits in box-drawing strokes (`┏━┓ ┃
     ┣━┫ ┗━┛`). Minimal and airy, but full hero size.
-  - **`outline`** — the same seven-segment skeleton as `simple` in **light**
-    strokes (`┌─┐ │`): a distinct airy/hollow clock that stays crisp at **every**
-    size — small, tiled, or maximised.
+  - **`outline`** — hollow **silhouette** of the block font: each digit is a
+    distinctive double-walled nested-rectangle drawn in box-drawing characters.
+    A bold hollow look, distinct from the line fonts.
+  - **`minimal`** — clean **light** line digits in box-drawing strokes (`┌─┐ │
+    └─┘`, airy `○` colon). Scales crisply at every size.
   - **`classic`** — tall, solid, **terminal-style numerals** that recreate a
     familiar monospace clock (light weight).
   - **`bold`** — the `classic` letterforms with heavier strokes.
@@ -143,12 +145,12 @@ Ratio   1:4.3 focus:rest
   █  █  █  █       ┃  ┃ ┃  ┃        │  │ │  │
   ████  ████       ┗━━┛ ┗━━┛        └──┘ └──┘
 
-  classic               bold
-   ███   ███            ████  ████
-  █   █ █   █           ██  ██ ██  ██
-  █   █ █   █           ██  ██ ██  ██
-  █   █ █   █           ██  ██ ██  ██
-   ███   ███            ████  ████
+  minimal          classic               bold
+  ┌──┐ ┌──┐         ███   ███            ████  ████
+  │  │ │  │        █   █ █   █           ██  ██ ██  ██
+  │  │ │  │        █   █ █   █           ██  ██ ██  ██
+  └──┘ └──┘        █   █ █   █           ██  ██ ██  ██
+                    ███   ███            ████  ████
   ```
 
 - **Themes** — `neon` (default), `amber`, `blue`, `mono`. Set the default with
@@ -238,27 +240,30 @@ The shell entry point still works and behaves identically:
 flowclock start --goal "Deep work — StreamNet" --target 1h --break-budget 20m
 ```
 
-### Display style — `block` / `simple` / `outline` / `classic` / `bold` (cycle live)
+### Display style — `block` / `simple` / `outline` / `minimal` / `classic` / `bold` (cycle live)
 
-The Session counter has five looks, all using the **same reserve-first scaling**
+The Session counter has six looks, all using the **same reserve-first scaling**
 so they stay prominent without overshadowing the metadata:
 
 - **`block`** (default) — solid 7-segment glyphs.
 - **`simple`** — clean **heavy** line digits in box-drawing strokes (`┏━┓ ┃`);
   minimal but full hero size.
-- **`outline`** — the same seven-segment skeleton in **light** strokes (`┌─┐ │`),
-  a distinct airy/hollow clock that stays crisp at every size (small, tiled, or
-  maximised).
+- **`outline`** — hollow **silhouette** of the block font drawn in box-drawing
+  characters: each digit is a distinctive double-walled nested-rectangle. A bold
+  hollow look that stays crisp at every size.
+- **`minimal`** — clean **light** line digits in box-drawing strokes (`┌─┐ │`),
+  airy `○` colon. Scales crisply at every size; lighter feel than `simple`.
 - **`classic`** — tall, solid, **terminal-style numerals** (light weight) — a
   familiar monospace clock.
 - **`bold`** — the `classic` letterforms with heavier strokes.
 
 Press **`d`** (or run `display` from the palette) to cycle
-`block → simple → outline → classic → bold`, and **`t`** to cycle the theme. Both
-choices are **saved to your config** as your new default — the same as running
-`config set displayStyle classic` / `config set theme neon`. The public default
-stays `block`; the rest are opt-in alternates. (`classic`/`bold` are taller
-9-row fonts; the layout maths stay exact via style-aware metrics.)
+`block → simple → outline → minimal → classic → bold`, and **`t`** to cycle the
+theme. Both choices are **saved to your config** as your new default — the same
+as running `config set displayStyle classic` / `config set theme neon`. The
+public default stays `block`; the rest are opt-in alternates. (`classic`/`bold`
+are taller 9-row fonts scaled to the same rendered footprint as the 5-row fonts,
+so cycling styles no longer changes the counter's overall size.)
 
 ### Live session controls
 
@@ -392,7 +397,7 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `theme` | `neon` | `neon` · `amber` · `blue` · `mono` |
-| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, `outline` hollow line-art, `classic` tall solid terminal numerals, or `bold` heavier — all same reserve-first scaling; cycle live with `d` |
+| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, `outline` hollow silhouette double-wall, `minimal` light line digits, `classic` tall solid terminal numerals, or `bold` heavier — all same reserve-first scaling; cycle live with `d` |
 | `showControls` | `true` | show the controls footer (`--zen` overrides) |
 | `dailyFocusGoalS` | `14400` | daily focus goal in seconds (drives maximization %) |
 | `keybindings.{pause,break,category,reset,quit}` | `p` `b` `c` `r` `q` | in-session keys |
@@ -423,6 +428,7 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v3.2.0** ✅ | `simple` reworked into a clean line font; `outline` added as a third selectable style; display-style toggle fixed on small/tiled windows |
 | **v3.3.0** ✅ | `classic` + `bold` terminal-style counter fonts; `outline` rewritten as clean line-art (fixes small/medium rendering); centered session layout; `z` zen + `Enter` hide-controls; delete a session from the dashboard (confirm modal); deduped controls footer |
 | **v3.3.1** ✅ | `outline` redrawn as a light seven-segment font (no more garbling at large scale); `classic`/`bold` degrade gracefully (drop goal line → block font) instead of collapsing to a text clock in a minimized window with metadata |
+| **v3.4.0** ✅ | restored the original silhouette `outline` style (hollow double-wall nested-rectangle); added `minimal` (light seven-segment line font); uniform counter scaling so `classic`/`bold` no longer tower over the 5-row fonts in minimized/zen windows |
 | **next** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 

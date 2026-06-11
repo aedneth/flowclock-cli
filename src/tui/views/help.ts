@@ -48,7 +48,7 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
 
   // Global
   body.push(padTo("Global:", innerW));
-  body.push(padTo("/ command palette · d display style (block/simple/outline/classic/bold) · t theme · r refresh · q/Esc quit", innerW));
+  body.push(padTo("/ command palette · d display style (block/simple/outline/minimal/classic/bold) · t theme · r refresh · q/Esc quit", innerW));
   body.push(padTo("Sessions list: Supr deletes (with confirm). d/t saved as default; both also in the / palette.", innerW));
 
   // Spacer

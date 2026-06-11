@@ -484,11 +484,99 @@ describe("renderSession — tall fonts do not collapse in a minimized window", (
     });
   }
 
-  it("outline: H16 renders clean light line-art (no solid blocks in the counter)", () => {
+  it("outline: H16 renders box-drawing line-art (not a collapsed single text line)", () => {
     const rows = mini("outline", 16);
-    const counter = rows.filter((r) => /[─│┌┐└┘]/.test(r)).join("");
-    expect(counter.length).toBeGreaterThan(0); // line-art is present
-    // Light box-drawing only — never the heavy seven-seg strokes.
-    expect(/[┃━┏┓┗┛]/.test(counter)).toBe(false);
+    const joined = rows.join("\n");
+    // Box-drawing line art must be present.
+    expect(/[─│┌┐└┘]/.test(joined)).toBe(true);
+    // The counter must NOT be the collapsed single text line.
+    expect(joined).not.toContain("00:12:34");
+  });
+});
+
+// ---------------------------------------------------------------------------
+// displayStyle: "minimal" (light seven-segment line digits)
+// ---------------------------------------------------------------------------
+
+describe("renderSession — minimal display style", () => {
+  const minimal = activeState({ displayStyle: "minimal" });
+
+  it("returns exactly rect.height rows at 80×24", () => {
+    expect(renderSession(minimal, rect(80, 24), "neon", false)).toHaveLength(24);
+  });
+
+  it("keeps centered metadata (goal 'Deep work' + 'focus') alongside the counter", () => {
+    const joined = renderSession(minimal, rect(80, 24), "neon", false).join("\n");
+    expect(joined).toContain("Deep work");
+    expect(joined).toContain("focus");
+  });
+
+  it("counter differs from block", () => {
+    const minimalRows = renderSession(minimal, rect(80, 24), "neon", false).join("\n");
+    const blockRows = renderSession(activeState({ displayStyle: "block" }), rect(80, 24), "neon", false).join("\n");
+    expect(minimalRows).not.toBe(blockRows);
+  });
+
+  it("all rows within width 80", () => {
+    for (const row of renderSession(minimal, rect(80, 24), "neon", false)) {
+      expect(displayWidth(row)).toBeLessThanOrEqual(80);
+    }
+  });
+});
+
+// ---------------------------------------------------------------------------
+// uniformCounterScale: classic/bold no longer tower over block/simple/minimal
+// ---------------------------------------------------------------------------
+
+describe("renderSession — classic/bold no longer tower over block in half/minimized window", () => {
+  // Before the fix, classic at scale 2 produced 18 rows of glyphs vs block's 10
+  // rows — causing the goal line to be dropped. The fix caps classic/bold so
+  // their rendered height is comparable to block. We verify by checking that the
+  // goal text "Deep work" is still present for classic at rect(100,30).
+  it("classic keeps goal text visible at rect(100,30) — not dropped by oversized counter", () => {
+    const classicRows = renderSession(
+      activeState({ displayStyle: "classic", goal: "Deep work" }),
+      rect(100, 30),
+      "neon",
+      false,
+    ).map(strip);
+    expect(classicRows.join("\n")).toContain("Deep work");
+  });
+
+  it("bold keeps goal text visible at rect(100,30)", () => {
+    const boldRows = renderSession(
+      activeState({ displayStyle: "bold", goal: "Deep work" }),
+      rect(100, 30),
+      "neon",
+      false,
+    ).map(strip);
+    expect(boldRows.join("\n")).toContain("Deep work");
+  });
+
+  it("classic glyph-row count is within a small delta of block at rect(100,30)", () => {
+    // block/classic/bold all draw solid █ counters; detecting █ isolates the
+    // counter rows (the panel border is │, and the only other █ — the focus
+    // progress bar — lives on a row containing "focus", which we exclude).
+    const isGlyphRow = (r: string) =>
+      /█/.test(r) &&
+      !/focus|break|Flowclock|Session|Deep work/.test(r);
+
+    const blockCount = renderSession(
+      activeState({ displayStyle: "block" }),
+      rect(100, 30),
+      "neon",
+      false,
+    ).map(strip).filter(isGlyphRow).length;
+
+    const classicCount = renderSession(
+      activeState({ displayStyle: "classic" }),
+      rect(100, 30),
+      "neon",
+      false,
+    ).map(strip).filter(isGlyphRow).length;
+
+    // With the fix, classic should be within 3 rows of block (both ~9-10 rows).
+    // Before the fix, classic was ~18 rows vs block ~10 — a delta of 8.
+    expect(Math.abs(classicCount - blockCount)).toBeLessThanOrEqual(3);
   });
 });

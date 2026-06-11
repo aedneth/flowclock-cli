@@ -3,6 +3,7 @@ import {
   renderBigLines,
   renderOutlineLines,
   renderSimpleLines,
+  renderMinimalLines,
   renderClassicLines,
   renderBoldLines,
   renderCounter,
@@ -11,6 +12,7 @@ import {
   bigWidth,
   computeScale,
   computeSessionScale,
+  uniformCounterScale,
   BIG_ROWS,
   BIG_MIN_COLS,
 } from "../src/lib/bigfont.js";
@@ -186,23 +188,6 @@ describe("renderOutlineLines (hollow / outline style)", () => {
   it("never throws on unexpected characters", () => {
     expect(() => renderOutlineLines("ab", 2)).not.toThrow();
   });
-
-  it("scales cleanly at scale >= 2 — light-weight twin of simple, no heavy strokes", () => {
-    // Regression: the old silhouette-of-block outline hollowed each one-cell
-    // stroke into a doubled "tube" at scale >= 2 (garbled in tiled windows).
-    // The seven-segment skeleton has its ink in the SAME cells as `simple`
-    // (so it scales just as cleanly) but in LIGHT box-drawing characters.
-    for (const scale of [1, 2, 3]) {
-      const outline = renderOutlineLines("12:34:56", scale);
-      const simple = renderSimpleLines("12:34:56", scale);
-      const mask = (rows: string[]) =>
-        rows.map((l) => [...l].map((c) => (c === " " ? " " : "#")).join(""));
-      expect(mask(outline)).toEqual(mask(simple)); // identical skeleton → scales cleanly
-      const joined = outline.join("");
-      expect(/[┃━┏┓┗┛┣┫┳┻╋]/.test(joined)).toBe(false); // light strokes only
-      expect(/[─│┌┐└┘]/.test(joined)).toBe(true);
-    }
-  });
 });
 
 describe("renderSimpleLines (heavy line / seven-segment style)", () => {
@@ -244,6 +229,47 @@ describe("renderSimpleLines (heavy line / seven-segment style)", () => {
   it("never throws on unexpected characters", () => {
     expect(() => renderSimpleLines("ab", 2)).not.toThrow();
     expect(renderSimpleLines("?")).toHaveLength(BIG_ROWS);
+  });
+});
+
+describe("renderMinimalLines (light seven-segment style)", () => {
+  it("matches the solid block's exact dimensions at scales 1, 2, 3", () => {
+    for (const scale of [1, 2, 3]) {
+      const solid = renderBigLines("12:34:56", scale);
+      const minimal = renderMinimalLines("12:34:56", scale);
+      expect(minimal).toHaveLength(solid.length);
+      minimal.forEach((row, i) => {
+        expect(row.length).toBe(solid[i]!.length);
+      });
+      expect(minimal[0]!.length).toBe(bigWidth("12:34:56", scale));
+    }
+  });
+
+  it("is the LIGHT-weight twin of simple — same ink-cell mask at scales 1, 2, 3", () => {
+    const mask = (rows: string[]) =>
+      rows.map((l) => [...l].map((c) => (c === " " ? " " : "#")).join(""));
+    for (const scale of [1, 2, 3]) {
+      expect(mask(renderMinimalLines("12:34:56", scale))).toEqual(
+        mask(renderSimpleLines("12:34:56", scale)),
+      );
+    }
+  });
+
+  it("uses LIGHT box-drawing only — no heavy strokes", () => {
+    const joined = renderMinimalLines("12:34:56", 2).join("");
+    expect(/[─│┌┐└┘]/.test(joined)).toBe(true);
+    expect(/[┃━┏┓┗┛┣┫┳┻╋]/.test(joined)).toBe(false);
+  });
+
+  it("is visually DISTINCT from block at scale 1", () => {
+    expect(renderMinimalLines("12:34:56", 1).join("\n")).not.toBe(
+      renderBigLines("12:34:56", 1).join("\n"),
+    );
+  });
+
+  it("never throws on unexpected characters", () => {
+    expect(() => renderMinimalLines("ab", 2)).not.toThrow();
+    expect(renderMinimalLines("?")).toHaveLength(BIG_ROWS);
   });
 });
 
@@ -309,6 +335,7 @@ describe("renderCounter (style dispatcher)", () => {
     expect(renderCounter("block", t, 2)).toEqual(renderBigLines(t, 2));
     expect(renderCounter("simple", t, 2)).toEqual(renderSimpleLines(t, 2));
     expect(renderCounter("outline", t, 2)).toEqual(renderOutlineLines(t, 2));
+    expect(renderCounter("minimal", t, 2)).toEqual(renderMinimalLines(t, 2));
     expect(renderCounter("classic", t, 2)).toEqual(renderClassicLines(t, 2));
     expect(renderCounter("bold", t, 2)).toEqual(renderBoldLines(t, 2));
   });
@@ -330,6 +357,40 @@ describe("computeSessionScale — style-aware", () => {
   it("still returns >= 1 for every style on a tiny area", () => {
     for (const style of ["block", "simple", "outline", "classic", "bold"] as const) {
       expect(computeSessionScale(10, 4, "00:00:00", { style })).toBeGreaterThanOrEqual(1);
+    }
+  });
+});
+
+describe("uniformCounterScale — consistent footprint across styles", () => {
+  it("5-row styles return the same scale as computeSessionScale (block reference)", () => {
+    const time = "00:00:00";
+    for (const area of [{ c: 98, r: 23 }, { c: 120, r: 31 }] as const) {
+      for (const style of ["block", "simple", "outline", "minimal"] as const) {
+        const expected = computeSessionScale(area.c, area.r, time, { style });
+        expect(uniformCounterScale(area.c, area.r, time, style)).toBe(expected);
+      }
+    }
+  });
+
+  it("tall fonts do NOT tower: classic returns smaller scale than independent computeSessionScale in a half-window", () => {
+    // At cols=98, rows=23, time="00:29:35" the block font renders at scale 2 (height 10).
+    // The OLD independent classic scale would be 2 (height 18 — towering).
+    // uniformCounterScale caps it to scale 1 (height 9) which fits the block reference.
+    const cols = 98, rows = 23, time = "00:29:35";
+    const blockRef = computeSessionScale(cols, rows, time, { style: "block" });
+    expect(blockRef).toBe(2); // confirm the reference is scale 2
+
+    const oldClassic = computeSessionScale(cols, rows, time, { style: "classic" });
+    const uniformClassic = uniformCounterScale(cols, rows, time, "classic");
+    // uniform should be less than the OLD independent scale (which would tower)
+    expect(uniformClassic).toBeLessThan(oldClassic);
+    // and the rendered height must not wildly exceed the block reference height
+    expect(uniformClassic * 9).toBeLessThanOrEqual(blockRef * 5 + 9);
+  });
+
+  it("returns >= 1 for every style on a tiny area", () => {
+    for (const style of ["block", "simple", "outline", "minimal", "classic", "bold"] as const) {
+      expect(uniformCounterScale(10, 4, "00:00:00", style)).toBeGreaterThanOrEqual(1);
     }
   });
 });

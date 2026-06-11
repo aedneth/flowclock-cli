@@ -36,7 +36,7 @@ export const PALETTE_COMMANDS: PaletteCommand[] = [
   { name: "history",  summary: "session history" },
   { name: "summary",  summary: "weekly markdown summary" },
   { name: "theme",    summary: "switch theme (neon|amber|blue|mono), saved" },
-  { name: "display",  summary: "cycle display style (block|simple|outline|classic|bold), saved" },
+  { name: "display",  summary: "cycle display style (block|simple|outline|minimal|classic|bold), saved" },
   { name: "zen",      summary: "toggle zen (clock only)" },
   { name: "help",     summary: "keybindings & help" },
   { name: "config",   summary: "show configuration" },

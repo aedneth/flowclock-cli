@@ -6,6 +6,36 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.4.0] - 2026-06-11
+
+Restores the original `outline` silhouette style that was accidentally replaced
+in v3.3.1, promotes the light seven-segment font it displaced into a new
+dedicated `minimal` style, and makes `classic`/`bold` scale uniformly so they
+no longer tower over the 5-row fonts in minimized or zen windows. Rendering
+only — no CLI, config, or data-schema changes. Default stays `block`.
+
+### Added
+
+- **New `minimal` display style** — the clean **light** seven-segment line font
+  (`┌─┐ │ └─┘`, airy `○` colon) that v3.3.1 mistakenly shipped as `outline` is
+  now its own first-class style. Minimal and airy; scales crisply at every size
+  and stays distinct from the heavier `simple` style. The full cycle is now
+  `block → simple → outline → minimal → classic → bold` (press `d`).
+
+### Fixed
+
+- **`outline` restored to its original silhouette design.** v3.3.1 replaced the
+  hollow, double-walled nested-rectangle digit (a block-font silhouette traced in
+  box-drawing characters) with a light seven-segment font. v3.4.0 brings back
+  the original — the distinctive hollow SILHOUETTE look — and keeps the
+  seven-segment font alive as the new `minimal` style.
+- **`classic`/`bold` uniform scaling.** The tall (9-row) fonts used to render
+  roughly 1.8× taller than the 5-row fonts in minimized/half/zen windows,
+  causing the counter to jump in size when cycling styles and sometimes hiding
+  the goal line. All six styles now target the same rendered footprint (the
+  5-row block font is the reference), so cycling with `d` no longer changes the
+  counter's overall size. No CLI or data-schema changes; default stays `block`.
+
 ## [3.3.1] - 2026-06-11
 
 Fixes the `outline`, `classic`, and `bold` styles collapsing in a minimized
@@ -325,7 +355,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.3.1...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.4.0...HEAD
+[3.4.0]: https://github.com/aedneth/flowclock-cli/compare/v3.3.1...v3.4.0
 [3.3.1]: https://github.com/aedneth/flowclock-cli/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/aedneth/flowclock-cli/compare/v3.2.0...v3.3.0
 [3.2.0]: https://github.com/aedneth/flowclock-cli/compare/v3.1.0...v3.2.0
