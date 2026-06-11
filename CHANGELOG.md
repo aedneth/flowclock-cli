@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.5.0] - 2026-06-11
+
+### Changed
+
+- **`classic` and `bold` redesigned as 5-row shade-weight variants of `block`
+  (light `▒` / heavy `▓`), sharing the exact 5-row × 4-col footprint of every
+  other style.** They previously rendered as taller 9-row letterforms.
+
+### Fixed
+
+- **In a minimized, non-zen window with session metadata, `classic`/`bold` no
+  longer tower over the other styles, cover the session goal, or silently fall
+  back to the `block` style** — every style now occupies an identical footprint
+  and renders its own glyphs at every window size.
+
 ## [3.4.1] - 2026-06-11
 
 ### Fixed
@@ -370,7 +385,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.4.1...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.5.0...HEAD
+[3.5.0]: https://github.com/aedneth/flowclock-cli/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/aedneth/flowclock-cli/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/aedneth/flowclock-cli/compare/v3.3.1...v3.4.0
 [3.3.1]: https://github.com/aedneth/flowclock-cli/compare/v3.3.0...v3.3.1

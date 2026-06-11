@@ -44,6 +44,31 @@ function rect(width: number, height: number): Rect {
   return { top: 0, left: 0, width, height };
 }
 
+/** Strip ANSI so we can inspect raw text + leading whitespace. */
+function strip(s: string): string {
+  // eslint-disable-next-line no-control-regex
+  return s.replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+/**
+ * Count "pure glyph rows": lines where every non-space character (ignoring the
+ * panel border │ that wraps each row) belongs to the given ink set. This correctly
+ * ignores the progress bar (▕██████████▏) and panel borders (single-line
+ * box-drawing), making it reliable for block/classic/bold whose inks (█ ▒ ▓)
+ * never appear in panel borders.
+ *
+ * The panel border renders as │...content...│ on each inner row, so we strip
+ * the leading and trailing │ before checking the ink constraint.
+ */
+function glyphRows(lines: string[], inks: string[]): number {
+  return lines.filter((l) => {
+    // Strip panel border │ from both ends, then trim spaces.
+    const stripped = l.replace(/^[│┌┐└┘─\s]+/, "").replace(/[│┌┐└┘─\s]+$/, "");
+    if (!stripped) return false;
+    return [...stripped].every((ch) => ch === " " || inks.includes(ch));
+  }).length;
+}
+
 // ---------------------------------------------------------------------------
 // ACTIVE — 80×24 (standard terminal)
 // ---------------------------------------------------------------------------
@@ -376,12 +401,6 @@ describe("renderSession — outline display style", () => {
 // Centered layout + zen (v3.3.0)
 // ---------------------------------------------------------------------------
 
-/** Strip ANSI so we can inspect raw text + leading whitespace. */
-function strip(s: string): string {
-  // eslint-disable-next-line no-control-regex
-  return s.replace(/\x1b\[[0-9;]*m/g, "");
-}
-
 describe("renderSession — centered goal + metadata", () => {
   // Rows include the 1-col panel border, so we measure the TEXT position:
   // centered text has substantial blank space on BOTH sides.
@@ -446,13 +465,12 @@ describe("renderSession — classic & bold display styles", () => {
 // ---------------------------------------------------------------------------
 // Minimized window + metadata + NON-zen — the collapse bug (v3.3.1)
 //
-// Tall fonts (classic/bold) used to collapse straight to a one-line text clock
-// when a minimized window was also showing session metadata. They must instead
-// degrade gracefully to a real glyph clock (their own font once it fits, else
-// the 5-row block font) while keeping the focus/break metadata visible.
+// Classic/bold now share block's 5-row footprint, so they render their own
+// ink (▒ / ▓) in a minimized window with metadata — never falling back to
+// block's █ glyphs and never collapsing to a bare text line.
 // ---------------------------------------------------------------------------
 
-describe("renderSession — tall fonts do not collapse in a minimized window", () => {
+describe("renderSession — classic/bold render own ink in a minimized window (no fallback)", () => {
   // Time with all-distinct digits so a lone "00:12:34" text line is detectable.
   const mini = (style: SessionViewState["displayStyle"], h: number) =>
     renderSession(
@@ -462,27 +480,41 @@ describe("renderSession — tall fonts do not collapse in a minimized window", (
       false,
     ).map(strip);
 
-  for (const style of ["classic", "bold"] as const) {
-    it(`${style}: H14 with metadata renders a real glyph clock, not a text line`, () => {
-      const rows = mini(style, 14);
-      const joined = rows.join("\n");
-      // Metadata still present (the whole point of NON-zen).
-      expect(joined).toContain("focus");
-      expect(joined).toContain("break");
-      // A real block-glyph counter is drawn (solid blocks in the counter area).
-      expect(joined).toContain("█");
-      // The counter is NOT the collapsed single text line: the literal clock
-      // string must NOT appear as a contiguous run.
-      expect(joined).not.toContain("00:12:34");
-    });
+  it("classic: H14 renders ▒ glyphs (its own ink), not █ or bare text", () => {
+    const rows = mini("classic", 14);
+    const joined = rows.join("\n");
+    // Metadata still present (the whole point of NON-zen).
+    expect(joined).toContain("focus");
+    expect(joined).toContain("break");
+    // Classic renders its own shade ink ▒, NOT block's █.
+    expect(joined).toContain("▒");
+    // The counter is NOT the collapsed single text line.
+    expect(joined).not.toContain("00:12:34");
+  });
 
-    it(`${style}: H12 (tighter) still shows a glyph clock + metadata`, () => {
-      const joined = mini(style, 12).join("\n");
-      expect(joined).toContain("focus");
-      expect(joined).toContain("█");
-      expect(joined).not.toContain("00:12:34");
-    });
-  }
+  it("classic: H12 (tighter) still shows ▒ glyphs + metadata (no fallback to block)", () => {
+    const joined = mini("classic", 12).join("\n");
+    expect(joined).toContain("focus");
+    expect(joined).toContain("▒");
+    expect(joined).not.toContain("00:12:34");
+  });
+
+  it("bold: H14 renders ▓ glyphs (its own ink), not █ or bare text", () => {
+    const rows = mini("bold", 14);
+    const joined = rows.join("\n");
+    expect(joined).toContain("focus");
+    expect(joined).toContain("break");
+    // Bold renders its own shade ink ▓, NOT block's █.
+    expect(joined).toContain("▓");
+    expect(joined).not.toContain("00:12:34");
+  });
+
+  it("bold: H12 (tighter) still shows ▓ glyphs + metadata (no fallback to block)", () => {
+    const joined = mini("bold", 12).join("\n");
+    expect(joined).toContain("focus");
+    expect(joined).toContain("▓");
+    expect(joined).not.toContain("00:12:34");
+  });
 
   it("outline: H16 renders box-drawing line-art (not a collapsed single text line)", () => {
     const rows = mini("outline", 16);
@@ -525,67 +557,11 @@ describe("renderSession — minimal display style", () => {
 });
 
 // ---------------------------------------------------------------------------
-// uniformCounterScale: classic/bold no longer tower over block/simple/minimal
+// v3.5 — classic/bold share block's footprint (Bug 1 + Bug 2 regression guards
+//         updated to reflect the new shade-weight design)
 // ---------------------------------------------------------------------------
 
-describe("renderSession — classic/bold no longer tower over block in half/minimized window", () => {
-  // Before the fix, classic at scale 2 produced 18 rows of glyphs vs block's 10
-  // rows — causing the goal line to be dropped. The fix caps classic/bold so
-  // their rendered height is comparable to block. We verify by checking that the
-  // goal text "Deep work" is still present for classic at rect(100,30).
-  it("classic keeps goal text visible at rect(100,30) — not dropped by oversized counter", () => {
-    const classicRows = renderSession(
-      activeState({ displayStyle: "classic", goal: "Deep work" }),
-      rect(100, 30),
-      "neon",
-      false,
-    ).map(strip);
-    expect(classicRows.join("\n")).toContain("Deep work");
-  });
-
-  it("bold keeps goal text visible at rect(100,30)", () => {
-    const boldRows = renderSession(
-      activeState({ displayStyle: "bold", goal: "Deep work" }),
-      rect(100, 30),
-      "neon",
-      false,
-    ).map(strip);
-    expect(boldRows.join("\n")).toContain("Deep work");
-  });
-
-  it("classic glyph-row count is within a small delta of block at rect(100,30)", () => {
-    // block/classic/bold all draw solid █ counters; detecting █ isolates the
-    // counter rows (the panel border is │, and the only other █ — the focus
-    // progress bar — lives on a row containing "focus", which we exclude).
-    const isGlyphRow = (r: string) =>
-      /█/.test(r) &&
-      !/focus|break|Flowclock|Session|Deep work/.test(r);
-
-    const blockCount = renderSession(
-      activeState({ displayStyle: "block" }),
-      rect(100, 30),
-      "neon",
-      false,
-    ).map(strip).filter(isGlyphRow).length;
-
-    const classicCount = renderSession(
-      activeState({ displayStyle: "classic" }),
-      rect(100, 30),
-      "neon",
-      false,
-    ).map(strip).filter(isGlyphRow).length;
-
-    // With the fix, classic should be within 3 rows of block (both ~9-10 rows).
-    // Before the fix, classic was ~18 rows vs block ~10 — a delta of 8.
-    expect(Math.abs(classicCount - blockCount)).toBeLessThanOrEqual(3);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// v3.4.1 — uniform footprint + consistent goal (Bug 1 + Bug 2 regression guards)
-// ---------------------------------------------------------------------------
-
-describe("v3.4.1 — uniform footprint + consistent goal", () => {
+describe("v3.5 — classic/bold share block's 5-row footprint (uniform counter)", () => {
   // State used for all sub-tests: active session with goal, focus target, and
   // break budget, no zen mode.
   const state34 = (style: SessionViewState["displayStyle"]): SessionViewState =>
@@ -598,56 +574,37 @@ describe("v3.4.1 — uniform footprint + consistent goal", () => {
       zen: false,
     });
 
-  /**
-   * Count rows that contain counter-glyph characters (solid block or double-line
-   * box-drawing) but are NOT metadata or goal lines.
-   * We use █ (present in block/classic/bold) as the counter signal for solid-font
-   * styles. This function is intentionally scoped to solid (█) styles so it
-   * remains unambiguous even in panels with box-drawing borders.
-   */
-  const solidCounterRows = (rows: string[]): number =>
-    rows
-      .map(strip)
-      .filter(
-        (r) =>
-          /█/.test(r) &&
-          !/focus|break|ratio|Session|Deep work/.test(r),
-      ).length;
+  // ── Test A: classic/bold glyph rows EXACTLY EQUAL block's — not just "close" ──
 
-  // ── Test A: classic/bold never taller than the line fonts in a TIGHT window ──
-
-  it("Test A — classic: counter rows never exceed block/simple/outline/minimal in a tight 92×17 window", () => {
+  it("Test A — classic: ▒ glyph rows EXACTLY equal block's █ glyph rows in a tight 92×17 window", () => {
     const w = 92, h = 17;
     const r = rect(w, h);
 
-    const lineStyles = ["block", "simple", "outline", "minimal"] as const;
-    const lineCounts = lineStyles.map((s) =>
-      solidCounterRows(renderSession(state34(s), r, "neon", false)),
-    );
-    const maxLineCount = Math.max(...lineCounts);
+    // Pure glyph rows: every non-space char must be the style's ink.
+    const blockRows = renderSession(state34("block"), r, "neon", false).map(strip);
+    const classicRows = renderSession(state34("classic"), r, "neon", false).map(strip);
 
-    const classicCount = solidCounterRows(
-      renderSession(state34("classic"), r, "neon", false),
-    );
-    // In a tight window classic falls back to block; its height must not exceed
-    // the tallest line-font counter in the same window.
-    expect(classicCount).toBeLessThanOrEqual(maxLineCount);
+    const blockCount = glyphRows(blockRows, ["█"]);
+    const classicCount = glyphRows(classicRows, ["▒"]);
+
+    // Exact footprint parity — delta must be 0.
+    expect(classicCount).toBe(blockCount);
+    // Classic must render at least 1 row of its own ▒ ink (no fallback to block).
+    expect(classicCount).toBeGreaterThanOrEqual(1);
   });
 
-  it("Test A — bold: counter rows never exceed block/simple/outline/minimal in a tight 92×17 window", () => {
+  it("Test A — bold: ▓ glyph rows EXACTLY equal block's █ glyph rows in a tight 92×17 window", () => {
     const w = 92, h = 17;
     const r = rect(w, h);
 
-    const lineStyles = ["block", "simple", "outline", "minimal"] as const;
-    const lineCounts = lineStyles.map((s) =>
-      solidCounterRows(renderSession(state34(s), r, "neon", false)),
-    );
-    const maxLineCount = Math.max(...lineCounts);
+    const blockRows = renderSession(state34("block"), r, "neon", false).map(strip);
+    const boldRows = renderSession(state34("bold"), r, "neon", false).map(strip);
 
-    const boldCount = solidCounterRows(
-      renderSession(state34("bold"), r, "neon", false),
-    );
-    expect(boldCount).toBeLessThanOrEqual(maxLineCount);
+    const blockCount = glyphRows(blockRows, ["█"]);
+    const boldCount = glyphRows(boldRows, ["▓"]);
+
+    expect(boldCount).toBe(blockCount);
+    expect(boldCount).toBeGreaterThanOrEqual(1);
   });
 
   // ── Test B: goal shown consistently across ALL six styles ──
@@ -681,22 +638,86 @@ describe("v3.4.1 — uniform footprint + consistent goal", () => {
     expect(/[╔║╚╗╝═]/.test(minimalJoined)).toBe(false);
   });
 
-  // ── Test D: roomy window preserves tall identity for classic ──
+  // ── Test D: roomy window — classic renders ▒ (own ink) at same footprint as block ──
+  // REPLACED: classic is now a 5-row shade font, never "tall" (> 5 glyph rows).
+  // This test verifies classic renders its own ▒ ink (not █) at the same glyph-row
+  // footprint as block in a roomy 92×28 window, with goal + % visible.
 
-  it("Test D — classic keeps tall identity (> 5 glyph rows) in a roomy 92×28 window, goal + % are present", () => {
+  it("Test D — classic renders ▒ (own ink, not █) at the same glyph-row footprint as block in a roomy 92×28 window, goal + % present", () => {
     const w = 92, h = 28;
     const r = rect(w, h);
 
-    const rows = renderSession(state34("classic"), r, "neon", false);
-    const stripped = rows.map(strip);
-    const joined = stripped.join("\n");
+    const classicRendered = renderSession(state34("classic"), r, "neon", false);
+    const blockRendered = renderSession(state34("block"), r, "neon", false);
 
-    // At 92×28 classic should remain as a tall font with more than 5 solid rows.
-    const glyphRowCount = solidCounterRows(rows);
-    expect(glyphRowCount).toBeGreaterThan(5);
+    const classicStripped = classicRendered.map(strip);
+    const blockStripped = blockRendered.map(strip);
+    const classicJoined = classicStripped.join("\n");
 
-    // Goal and focus-% metadata must both survive alongside the tall counter.
-    expect(joined).toContain("Deep work");
-    expect(joined).toContain("%");
+    // Glyph row parity: classic's ▒ rows == block's █ rows.
+    const classicGlyphCount = glyphRows(classicStripped, ["▒"]);
+    const blockGlyphCount = glyphRows(blockStripped, ["█"]);
+    expect(classicGlyphCount).toBe(blockGlyphCount);
+
+    // Classic inks with ▒ in its glyph rows — must have at least 1.
+    expect(classicGlyphCount).toBeGreaterThanOrEqual(1);
+    // Joined content of classic's output must contain ▒.
+    expect(classicJoined).toContain("▒");
+
+    // Goal and focus-% metadata must both survive alongside the counter.
+    expect(classicJoined).toContain("Deep work");
+    expect(classicJoined).toContain("%");
+  });
+
+  // ── NEW guard: tight minimized window — classic/bold use their own ink, never fall back to block ──
+
+  it("NEW — classic renders ▒ and NOT █ in glyph rows in a tight 84×17 window, goal present", () => {
+    const r = rect(84, 17);
+    const st = activeState({
+      displayStyle: "classic",
+      goal: "Guard test",
+      focusTargetS: 1200,
+      breakBudgetS: 300,
+      zen: false,
+    });
+    const rows = renderSession(st, r, "neon", false).map(strip);
+    const joined = rows.join("\n");
+
+    // Classic must use its own ▒ ink.
+    expect(joined).toContain("▒");
+    // Goal must survive.
+    expect(joined).toContain("Guard test");
+
+    // No pure glyph row should contain █ — classic never falls back to block ink.
+    const blockGlyphRows = rows.filter((l) => {
+      const t = l.trim();
+      return t && [...t].every((ch) => ch === " " || ch === "█");
+    });
+    expect(blockGlyphRows).toHaveLength(0);
+  });
+
+  it("NEW — bold renders ▓ and NOT █ in glyph rows in a tight 84×17 window, goal present", () => {
+    const r = rect(84, 17);
+    const st = activeState({
+      displayStyle: "bold",
+      goal: "Guard test",
+      focusTargetS: 1200,
+      breakBudgetS: 300,
+      zen: false,
+    });
+    const rows = renderSession(st, r, "neon", false).map(strip);
+    const joined = rows.join("\n");
+
+    // Bold must use its own ▓ ink.
+    expect(joined).toContain("▓");
+    // Goal must survive.
+    expect(joined).toContain("Guard test");
+
+    // No pure glyph row should contain █ — bold never falls back to block ink.
+    const blockGlyphRows = rows.filter((l) => {
+      const t = l.trim();
+      return t && [...t].every((ch) => ch === " " || ch === "█");
+    });
+    expect(blockGlyphRows).toHaveLength(0);
   });
 });

@@ -132,9 +132,10 @@ Ratio   1:4.3 focus:rest
     `minimal` at every scale, including scale 1 (minimized windows).
   - **`minimal`** — clean **light** line digits in box-drawing strokes (`┌─┐ │
     └─┘`, airy `○` colon). Scales crisply at every size.
-  - **`classic`** — tall, solid, **terminal-style numerals** that recreate a
-    familiar monospace clock (light weight).
-  - **`bold`** — the `classic` letterforms with heavier strokes.
+  - **`classic`** — solid terminal numerals in a **light shade weight** (`▒`),
+    sharing the exact 5-row × 4-col footprint of every other style.
+  - **`bold`** — solid terminal numerals in a **heavy shade weight** (`▓`),
+    sharing the exact 5-row × 4-col footprint of every other style.
 
   The goal sits **centered** above the counter and the focus/break metadata
   centered below it. Override the standalone HUD per session with `start --big`.
@@ -147,11 +148,11 @@ Ratio   1:4.3 focus:rest
   ████  ████       ┗━━┛ ┗━━┛        ╚══╝ ╚══╝
 
   minimal          classic               bold
-  ┌──┐ ┌──┐         ███   ███            ████  ████
-  │  │ │  │        █   █ █   █           ██  ██ ██  ██
-  │  │ │  │        █   █ █   █           ██  ██ ██  ██
-  └──┘ └──┘        █   █ █   █           ██  ██ ██  ██
-                    ███   ███            ████  ████
+  ┌──┐ ┌──┐         ▒▒▒  ▒▒▒▒            ▓▓▓  ▓▓▓▓
+  │  │ │  │        ▒   ▒ ▒   ▒           ▓   ▓ ▓   ▓
+  │  │ │  │        ▒▒▒▒▒ ▒▒▒▒▒           ▓▓▓▓▓ ▓▓▓▓▓
+  └──┘ └──┘        ▒   ▒ ▒   ▒           ▓   ▓ ▓   ▓
+                   ▒▒▒▒▒ ▒▒▒▒▒           ▓▓▓▓▓ ▓▓▓▓▓
   ```
 
 - **Themes** — `neon` (default), `amber`, `blue`, `mono`. Set the default with
@@ -255,17 +256,19 @@ so they stay prominent without overshadowing the metadata:
   at every scale (including scale 1 / minimized windows).
 - **`minimal`** — clean **light** line digits in box-drawing strokes (`┌─┐ │`),
   airy `○` colon. Scales crisply at every size; lighter feel than `simple`.
-- **`classic`** — tall, solid, **terminal-style numerals** (light weight) — a
-  familiar monospace clock.
-- **`bold`** — the `classic` letterforms with heavier strokes.
+- **`classic`** — solid terminal numerals in a **light shade weight** (`▒`),
+  sharing the exact 5-row × 4-col footprint of every other style.
+- **`bold`** — solid terminal numerals in a **heavy shade weight** (`▓`),
+  sharing the exact 5-row × 4-col footprint of every other style.
 
 Press **`d`** (or run `display` from the palette) to cycle
 `block → simple → outline → minimal → classic → bold`, and **`t`** to cycle the
 theme. Both choices are **saved to your config** as your new default — the same
 as running `config set displayStyle classic` / `config set theme neon`. The
-public default stays `block`; the rest are opt-in alternates. (`classic`/`bold`
-are taller 9-row fonts scaled to the same rendered footprint as the 5-row fonts,
-so cycling styles no longer changes the counter's overall size.)
+public default stays `block`; the rest are opt-in alternates. All six styles
+share the same 5-row footprint — `classic`/`bold` are shade-weight variants of
+`block` (`▒` light / `▓` heavy), so cycling styles never changes the counter's
+size or covers the session goal.
 
 ### Live session controls
 
@@ -399,7 +402,7 @@ Stored at `config.json` in your config dir (`flowclock config path`). Keys:
 | Key | Default | Meaning |
 | --- | --- | --- |
 | `theme` | `neon` | `neon` · `amber` · `blue` · `mono` |
-| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, `outline` hollow silhouette in double-line chars (`╔═╗`) distinct from `minimal`, `minimal` light line digits, `classic` tall solid terminal numerals, or `bold` heavier — all same reserve-first scaling; cycle live with `d` |
+| `displayStyle` | `block` | Counter look: `block` solid (default), `simple` heavy line digits, `outline` hollow silhouette in double-line chars (`╔═╗`) distinct from `minimal`, `minimal` light line digits, `classic` light-shade `▒` solid numerals, `bold` heavy-shade `▓` — all share the exact 5-row footprint; cycle live with `d` |
 | `showControls` | `true` | show the controls footer (`--zen` overrides) |
 | `dailyFocusGoalS` | `14400` | daily focus goal in seconds (drives maximization %) |
 | `keybindings.{pause,break,category,reset,quit}` | `p` `b` `c` `r` `q` | in-session keys |
@@ -432,6 +435,7 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v3.3.1** ✅ | `outline` redrawn as a light seven-segment font (no more garbling at large scale); `classic`/`bold` degrade gracefully (drop goal line → block font) instead of collapsing to a text clock in a minimized window with metadata |
 | **v3.4.0** ✅ | restored the original silhouette `outline` style (hollow double-wall nested-rectangle); added `minimal` (light seven-segment line font); uniform counter scaling so `classic`/`bold` no longer tower over the 5-row fonts in minimized/zen windows |
 | **v3.4.1** ✅ | `outline` double-line box-drawing chars (`╔═╗`) — distinct from `minimal` at every scale; uniform `classic`/`bold` footprint — height capped to 5-row reference, degrades to `block` in short windows |
+| **v3.5.0** ✅ | `classic`/`bold` redesigned as 5-row shade weights (`▒`/`▓`) for exact footprint parity with all styles — no more towering, goal covering, or silent fallback to `block` |
 | **next** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 
