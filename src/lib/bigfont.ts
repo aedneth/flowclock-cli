@@ -233,20 +233,29 @@ export function renderMinimalLines(time: string, scale = 1): string[] {
 }
 
 /**
- * Exposed-wall bitmask → box-drawing character tracing a glyph's silhouette.
+ * Exposed-wall bitmask → DOUBLE-LINE box-drawing character tracing a glyph's
+ * silhouette.
  *
  * For a filled cell we look at which of its four sides face an EMPTY cell (or
  * the grid edge) — those are "walls". The bitmask is T=8 · B=4 · L=2 · R=1, and
  * the chosen char draws the wall(s) so the union of all cells forms a clean
  * line-art outline of the digit. Interior cells (no exposed walls) map to a
  * blank, hollowing the glyph at EVERY scale.
+ *
+ * The strokes are DOUBLE-LINE (╔═╗ ║ ╚╝) rather than single-line (┌─┐ │ └┘).
+ * This is what makes `outline` read as a distinct, heavier "double-walled"
+ * style even at scale 1 — where the silhouette of a 1-cell-thick block collapses
+ * to a single hollow rectangle that would otherwise be indistinguishable from
+ * the light single-line `minimal` seven-segment font. (At scale ≥ 2 the trace
+ * additionally doubles each stroke into a nested "tube"; the double-line weight
+ * keeps the two visually distinct at every scale.)
  */
 const OUTLINE_CHARS: Record<number, string> = {
   0: " ", // interior → hollow
-  8: "─", 4: "─", 2: "│", 1: "│", // single wall
-  12: "─", 3: "│", // opposite walls (thin bar / thin column)
-  10: "┌", 9: "┐", 6: "└", 5: "┘", // corners (T+L, T+R, B+L, B+R)
-  14: "─", 13: "─", 11: "│", 7: "│", // three walls → follow the dominant axis
+  8: "═", 4: "═", 2: "║", 1: "║", // single wall
+  12: "═", 3: "║", // opposite walls (thin bar / thin column)
+  10: "╔", 9: "╗", 6: "╚", 5: "╝", // corners (T+L, T+R, B+L, B+R)
+  14: "═", 13: "═", 11: "║", 7: "║", // three walls → follow the dominant axis
   15: "▫", // isolated cell (e.g. colon dot)
 };
 
@@ -254,10 +263,13 @@ const OUTLINE_CHARS: Record<number, string> = {
  * Render a clock string as a HOLLOW SILHOUETTE clock — the "outline" display
  * style. It shares the exact geometry, scaling and dimensions of the solid
  * `renderBigLines` (so the reserve-first layout maths are identical), but each
- * glyph is drawn as box-drawing line-art: every filled cell becomes a
- * box-drawing character tracing the parts of its border that face empty space,
- * and interior cells are blanked. The result is a distinctive double-walled
- * hollow digit that reads as a unique style at every scale — including scale 1.
+ * glyph is drawn as DOUBLE-LINE box-drawing line-art: every filled cell becomes
+ * a box-drawing character (╔═╗ ║ ╚╝) tracing the parts of its border that face
+ * empty space, and interior cells are blanked. The result is a distinctive
+ * double-walled hollow digit that reads as a unique style at every scale —
+ * including scale 1, where the double-line weight keeps it clearly distinct from
+ * the light single-line `minimal` font (whose silhouette it would otherwise
+ * exactly match at that size).
  *
  * This is intentionally NOT the seven-segment skeleton used by `simple` /
  * `minimal`: as the digit scales up, each block stroke (one cell thick at scale
@@ -318,8 +330,8 @@ export function computeSessionScale(
  * `block` font is the reference: we scale every style toward the SAME target
  * rendered height (block's), so all styles occupy roughly the same vertical
  * footprint. 5-row styles are unaffected (they already match block exactly);
- * the tall fonts pick the integer scale whose height is closest to the
- * reference without exceeding what physically fits.
+ * the tall fonts pick the LARGEST integer scale whose height does not exceed
+ * the reference, so they never overshoot the line fonts or crowd the goal line.
  */
 export function uniformCounterScale(
   areaCols: number,
@@ -337,9 +349,10 @@ export function uniformCounterScale(
   // 5-row styles already match the reference; only the tall fonts need taming.
   if (styleBaseRows(style) === styleBaseRows("block")) return natural;
 
-  // Scale the tall font toward the reference height (nearest integer, ≥ 1),
-  // then clamp to what actually fits so we never overflow the area.
-  const target = Math.max(1, Math.round(refHeight / styleBaseRows(style)));
+  // Scale the tall font to the LARGEST integer height that does NOT exceed the
+  // reference (floor, not round) — so classic/bold never tower over the line
+  // fonts or crowd the goal line — then clamp to what actually fits the area.
+  const target = Math.max(1, Math.floor(refHeight / styleBaseRows(style)));
   return Math.min(natural, target);
 }
 

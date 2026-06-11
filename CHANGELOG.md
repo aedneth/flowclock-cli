@@ -6,6 +6,21 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.4.1] - 2026-06-11
+
+### Fixed
+
+- **`outline` display style now renders in DOUBLE-LINE box-drawing characters
+  (`╔═╗ ║ ╚╝`)**, making it visually distinct from `minimal` at every scale.
+  Previously, in a minimized window (scale 1) the two styles were
+  byte-identical — both rendered the same single-line box-drawing glyphs —
+  so cycling `outline` ↔ `minimal` appeared to do nothing.
+- **`classic`/`bold` tall fonts no longer tower over the other styles or hide
+  the session goal.** Their rendered height is capped to the 5-row reference
+  footprint (the `block` font), and they degrade gracefully to `block` in
+  windows too short to show them without towering — keeping the counter
+  footprint and goal line uniform across all six styles.
+
 ## [3.4.0] - 2026-06-11
 
 Restores the original `outline` silhouette style that was accidentally replaced
@@ -355,7 +370,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.4.0...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.4.1...HEAD
+[3.4.1]: https://github.com/aedneth/flowclock-cli/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/aedneth/flowclock-cli/compare/v3.3.1...v3.4.0
 [3.3.1]: https://github.com/aedneth/flowclock-cli/compare/v3.3.0...v3.3.1
 [3.3.0]: https://github.com/aedneth/flowclock-cli/compare/v3.2.0...v3.3.0

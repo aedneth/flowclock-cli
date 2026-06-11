@@ -20,6 +20,7 @@ import {
   renderCounter,
   styleWidth,
   styleBaseRows,
+  computeSessionScale,
   uniformCounterScale,
 } from "../../lib/bigfont.js";
 import type { DisplayStyle } from "../../schemas/config.js";
@@ -74,15 +75,20 @@ interface CounterPlan {
  * Decide how to fit the counter into the available rows — the graceful
  * degradation ladder that keeps a real glyph clock on screen far longer:
  *
- *   1. requested style at its base height, keeping the goal line;
+ *   1. requested style, but a tall (9-row) font is used ONLY while it stays
+ *      within the 5-row block reference's footprint (so it never towers over
+ *      the line fonts or crowds the goal); keeping the goal line;
  *   2. requested style, with the goal line DROPPED to reclaim two rows;
- *   3. tall fonts (classic/bold, 9 rows) fall back to the 5-row `block` font,
- *      keeping then dropping the goal;
+ *   3. tall fonts (classic/bold) that would tower — or don't fit — fall back to
+ *      the 5-row `block` font, keeping then dropping the goal, so the counter's
+ *      footprint stays uniform across every style;
  *   4. only when even a 5-row font cannot fit do we collapse to the single
  *      centered text line.
  *
- * Without this, a minimized window showing session metadata left no room for the
- * 9-row classic/bold fonts, so they collapsed straight to the tiny text clock.
+ * The footprint gate is the key to a consistent size across styles: a 9-row
+ * font cannot occupy the same 5 rows as the line fonts, so in a window too short
+ * to render it without dwarfing them, classic/bold degrade to block. In roomier
+ * windows they keep their tall identity at a height that matches block.
  */
 function planCounter(
   innerW: number,
@@ -93,26 +99,45 @@ function planCounter(
   bottomCount: number,
 ): CounterPlan {
   const bottomReserve = bottomCount > 0 ? bottomCount + 1 : 0; // lines + gap
-  const fits = (st: DisplayStyle, goalRows: number): boolean =>
-    innerW >= styleWidth(st, time, 1) &&
-    innerH - (goalRows + bottomReserve) >= styleBaseRows(st);
-
   const goalRows = hasGoal ? 2 : 0; // goal line + its gap
+  const availRows = (gr: number): number => innerH - (gr + bottomReserve);
+  const fits = (st: DisplayStyle, gr: number): boolean =>
+    innerW >= styleWidth(st, time, 1) && availRows(gr) >= styleBaseRows(st);
 
-  // 1-2: requested style, keeping the goal if it fits, else dropping it.
-  if (fits(style, goalRows)) return { style, showGoal: hasGoal };
-  if (hasGoal && fits(style, 0)) return { style, showGoal: false };
-
-  // 3-4: tall fonts degrade to the 5-row block font before giving up on glyphs.
   const isTall = styleBaseRows(style) > styleBaseRows("block");
-  if (isTall) {
+
+  // A tall (9-row) font keeps its footprint only if the 5-row block reference
+  // would render at least as tall in the same area — i.e. there is room for the
+  // tall font to sit at/below block's height rather than towering over it.
+  const tallKeepsFootprint = (gr: number): boolean => {
+    if (!fits(style, gr)) return false;
+    const blockH =
+      computeSessionScale(innerW, Math.max(1, availRows(gr)), time, { style: "block" }) *
+      styleBaseRows("block");
+    return blockH >= styleBaseRows(style);
+  };
+
+  if (!isTall) {
+    // 1-2: a 5-row style — keep the goal if it fits, else drop it.
+    if (fits(style, goalRows)) return { style, showGoal: hasGoal };
+    if (hasGoal && fits(style, 0)) return { style, showGoal: false };
+  } else {
+    // 1: a tall style — kept ONLY while it fits WITH the goal and stays within
+    //    the block footprint. We deliberately do NOT drop the goal to squeeze a
+    //    tall font in: the line fonts keep the goal at this size, so dropping it
+    //    for classic/bold would make the counter both taller AND goal-less than
+    //    every other style. Falling back to block (below) keeps the goal.
+    if (tallKeepsFootprint(goalRows)) return { style, showGoal: hasGoal };
+    // 2-3: it would tower (or not fit with the goal) → fall back to the 5-row
+    //      block font — keeping then dropping the goal exactly as the line fonts
+    //      would — so the footprint and goal stay uniform across every style.
     if (fits("block", goalRows)) return { style: "block", showGoal: hasGoal };
     if (hasGoal && fits("block", 0)) return { style: "block", showGoal: false };
   }
 
   // 5: last resort — single centered text line. Keep the goal only if there is
   // still a row for the clock after the goal + metadata.
-  return { style: "text", showGoal: hasGoal && innerH - (goalRows + bottomReserve) >= 1 };
+  return { style: "text", showGoal: hasGoal && availRows(goalRows) >= 1 };
 }
 
 // ---------------------------------------------------------------------------
