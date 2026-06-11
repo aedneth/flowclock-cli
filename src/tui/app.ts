@@ -13,7 +13,7 @@ import type { Session } from "../schemas/session.js";
 import type { ThemeName, DisplayStyle } from "../schemas/config.js";
 import type { BreakCategory } from "../schemas/session.js";
 import { buildSnapshot } from "../lib/snapshot.js";
-import { readSessions, appendSession } from "../lib/session.js";
+import { readSessions, appendSession, deleteSession } from "../lib/session.js";
 import { sessionsPathFor, saveConfig } from "../lib/config.js";
 import { Timer } from "../lib/timer.js";
 import { suggestBreakS } from "../lib/flowtime.js";
@@ -45,6 +45,13 @@ import {
   renderSessionForm,
 } from "./sessionform.js";
 import type { SessionFormState, SessionFormValues } from "./sessionform.js";
+import {
+  emptyConfirmState,
+  openConfirmState,
+  confirmApplyKey,
+  renderConfirm,
+} from "./confirm.js";
+import type { ConfirmState } from "./confirm.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -76,8 +83,8 @@ const BREAK_CATEGORIES: BreakCategory[] = [
 /** All available themes in cycle order. */
 const THEMES: ThemeName[] = ["neon", "amber", "blue", "mono"];
 
-/** Display styles in toggle order. */
-const DISPLAY_STYLES: DisplayStyle[] = ["block", "simple", "outline"];
+/** Display styles in toggle order (cycled with `d` / the `display` command). */
+const DISPLAY_STYLES: DisplayStyle[] = ["block", "simple", "outline", "classic", "bold"];
 
 const CTRL_C = "\x03";
 
@@ -109,9 +116,14 @@ interface AppState {
   live: LiveSession | null;
   palette: PaletteState;
   form: SessionFormState;
+  confirm: ConfirmState;
   summary: SummaryState | null;
   theme: ThemeName;
   displayStyle: DisplayStyle;
+  /** Live-session zen toggle (`z`): hides goal + metadata, hero clock only. */
+  zenLive: boolean;
+  /** Hide the global footer control hints (Enter) to remove visual noise. */
+  hideControls: boolean;
 }
 
 // ---------------------------------------------------------------------------
@@ -276,10 +288,8 @@ export function buildFrame(
               suggestedBreakS: suggestBreakS(live.timer.elapsedS()),
               focusTargetS: live.focusTargetS,
               breakBudgetS: live.breakBudgetS,
-              zen: false,
-              showControls: true,
+              zen: state.zenLive,
               displayStyle: state.displayStyle,
-              keybindings: ctx.config.keybindings,
             };
           } else {
             sv = {
@@ -296,9 +306,7 @@ export function buildFrame(
               focusTargetS: null,
               breakBudgetS: null,
               zen: false,
-              showControls: true,
               displayStyle: state.displayStyle,
-              keybindings: ctx.config.keybindings,
             };
           }
           bodyRows = renderSession(sv, bodyRect, theme, color);
@@ -326,6 +334,9 @@ export function buildFrame(
   }
 
   // ── FOOTER (context-sensitive) ────────────────────────────────────────────
+  // The footer is the SINGLE source of session controls — the session panel no
+  // longer renders its own, so they never duplicate. `z` toggles zen (panel
+  // metadata) and Enter toggles this control row's visibility.
   let footerHints: string;
   if (state.summary) {
     if (state.summary.askGoal) {
@@ -333,19 +344,28 @@ export function buildFrame(
     } else {
       footerHints = "[any key] dismiss";
     }
+  } else if (state.confirm.open) {
+    footerHints = "[y] confirm · [n] cancel";
   } else if (state.form.open) {
     footerHints = "[Tab] next field · [Enter] start · [Esc] cancel";
   } else if (state.palette.open) {
     footerHints = "[↑↓] select · [Enter] run · [Esc] cancel";
   } else if (state.live && state.view === "session") {
-    const kb = ctx.config.keybindings;
-    if (state.live.timer.isOnBreak) {
-      footerHints = `[1]rest [2]meal [3]exercise [4]walk [5]distraction [6]other  [${kb.break}] resume`;
+    if (state.hideControls) {
+      // Controls hidden (Enter) — keep the row clean; press Enter to restore.
+      footerHints = "";
     } else {
-      footerHints = `[${kb.pause}] pause · [${kb.break}] break · [1-6] cat · [${kb.reset}] reset · [${kb.quit}] stop & save · [Tab] views`;
+      const kb = ctx.config.keybindings;
+      if (state.live.timer.isOnBreak) {
+        footerHints = `[1]rest [2]meal [3]exercise [4]walk [5]distraction [6]other · [${kb.break}] resume · [Enter] hide`;
+      } else {
+        footerHints = `[${kb.pause}] pause · [${kb.break}] break · [1-6] cat · [${kb.reset}] reset · [z] zen · [Enter] hide · [${kb.quit}] stop · [Tab] views`;
+      }
     }
   } else if (state.live) {
     footerHints = `[Tab]/[1-6] views · session ● ${state.live.timer.display()} running · [d] style · [Ctrl-C] quit`;
+  } else if (state.view === "sessions") {
+    footerHints = "[↑↓] select · [Enter] detail · [Supr] delete · [Tab] views · [q] quit";
   } else {
     footerHints = "[Tab] views · [s] start · [/] commands · [d] style · [t] theme · [q] quit";
   }
@@ -361,6 +381,12 @@ export function buildFrame(
   if (state.summary) {
     const summaryOverlay = buildSummaryOverlay(state.summary, cols, rows, theme, color);
     return compositeOverlay(baseFrame, summaryOverlay, cols);
+  }
+
+  // Confirm overlay (destructive action, e.g. delete session)
+  if (state.confirm.open) {
+    const confirmOverlay = renderConfirm(state.confirm, cols, rows, theme, color);
+    return compositeOverlay(baseFrame, confirmOverlay, cols);
   }
 
   // New-session form overlay
@@ -455,9 +481,12 @@ export async function runDashboardApp(
       live: null,
       palette: emptyPaletteState(),
       form: emptySessionFormState(),
+      confirm: emptyConfirmState(),
       summary: null,
       theme: ctx.config.theme,
       displayStyle: ctx.config.displayStyle,
+      zenLive: false,
+      hideControls: false,
     };
 
     // If a pending session is provided, start it immediately
@@ -544,6 +573,9 @@ export async function runDashboardApp(
 
       stopTick();
       state.live = null;
+      // Reset live-only view toggles so the next session starts normally.
+      state.zenLive = false;
+      state.hideControls = false;
 
       if (exitAfter) {
         appendSession(file, record);
@@ -620,7 +652,7 @@ export async function runDashboardApp(
       render();
     }
 
-    /** Cycle the display style (block → simple → outline, live) and persist it. */
+    /** Cycle the display style (block → simple → outline → classic → bold, live) and persist it. */
     function cycleDisplayStyle() {
       const idx = DISPLAY_STYLES.indexOf(state.displayStyle);
       state.displayStyle = DISPLAY_STYLES[(idx + 1) % DISPLAY_STYLES.length]!;
@@ -762,6 +794,26 @@ export async function runDashboardApp(
         return;
       }
 
+      // ── (1a) Confirm modal: y confirms · n/Esc/Enter cancel ───────────────
+      if (state.confirm.open) {
+        // Ctrl-C closes the modal (never deletes) without exiting the app.
+        if (key.name === "char" && key.char === CTRL_C) {
+          state.confirm = emptyConfirmState();
+          render();
+          return;
+        }
+        const result = confirmApplyKey(state.confirm, key);
+        state.confirm = result.state;
+        if (result.action?.type === "confirm" && result.action.payload) {
+          state.sessions = deleteSession(file, result.action.payload);
+          clampSelection();
+          render();
+          return;
+        }
+        render();
+        return;
+      }
+
       // ── (1b) New-session form: feed keys to its reducer ───────────────────
       if (state.form.open) {
         // Ctrl-C aborts the form and exits cleanly (no live session yet).
@@ -873,12 +925,26 @@ export async function runDashboardApp(
             render();
             return;
           }
+
+          if (ch === "z") {
+            // Zen toggle: hide goal + metadata in the panel, hero clock only.
+            state.zenLive = !state.zenLive;
+            render();
+            return;
+          }
         }
 
         if (key.name === "tab") {
           const idx = VIEWS.indexOf(state.view);
           state.view = VIEWS[(idx + 1) % VIEWS.length]!;
           state.detailOpen = false;
+          render();
+          return;
+        }
+
+        if (key.name === "enter") {
+          // Toggle the control-hints row to remove visual noise once memorized.
+          state.hideControls = !state.hideControls;
           render();
           return;
         }
@@ -893,6 +959,21 @@ export async function runDashboardApp(
         state.view = VIEWS[(idx + 1) % VIEWS.length]!;
         state.detailOpen = false;
         render();
+        return;
+      }
+
+      // Delete / Supr on the Sessions list → confirm modal, then delete.
+      if (key.name === "delete" && state.view === "sessions" && !state.detailOpen) {
+        const snap = buildSnapshot(state.sessions, ctx.config.dailyFocusGoalS);
+        const session = snap.recent[state.selectedIndex];
+        if (session) {
+          state.confirm = openConfirmState({
+            title: "Delete session",
+            message: "Delete this session? This cannot be undone.",
+            payload: session.id,
+          });
+          render();
+        }
         return;
       }
 
@@ -919,7 +1000,7 @@ export async function runDashboardApp(
           return;
         }
 
-        // Cycle display style (block → simple → outline) — anywhere, persisted.
+        // Cycle display style (block → simple → outline → classic → bold) — anywhere, persisted.
         if (ch === "d") {
           cycleDisplayStyle();
           return;

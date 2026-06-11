@@ -10,9 +10,17 @@ export type ThemeName = z.infer<typeof ThemeNameSchema>;
  * HUD / counter display style:
  *  - "block"   solid block glyphs (default)
  *  - "simple"  clean heavy box-drawing seven-segment digits
- *  - "outline" hollow edge-traced block glyphs
+ *  - "outline" hollow box-drawing line-art glyphs
+ *  - "classic" tall solid terminal-style numerals (light weight)
+ *  - "bold"    tall solid terminal-style numerals (heavy weight)
  */
-export const DisplayStyleSchema = z.enum(["simple", "block", "outline"]);
+export const DisplayStyleSchema = z.enum([
+  "simple",
+  "block",
+  "outline",
+  "classic",
+  "bold",
+]);
 export type DisplayStyle = z.infer<typeof DisplayStyleSchema>;
 
 export const KeybindingsSchema = z.object({

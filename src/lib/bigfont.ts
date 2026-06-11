@@ -5,6 +5,8 @@
  * The font scales up to fill the available terminal space via `computeScale`.
  */
 
+import type { DisplayStyle } from "../schemas/config.js";
+
 export const BIG_ROWS = 5;
 /** Minimum cols to render HH:MM:SS at scale 1 (exact base width). */
 export const BIG_MIN_COLS = 33;
@@ -204,39 +206,54 @@ export function renderSimpleLines(time: string, scale = 1): string[] {
 }
 
 /**
- * Render a clock string as a HOLLOW / OUTLINE block — the "outline" display
- * style. It shares the exact geometry, scaling and dimensions of the solid
- * `renderBigLines` (so the reserve-first layout maths are identical), but only
- * the EDGE cells of each glyph are drawn: interiors are hollowed out. The
- * result is an airy, edge-traced clock — distinct from both the solid `block`
- * and the line-art `simple` styles.
+ * Exposed-wall bitmask → box-drawing character tracing a glyph's silhouette.
  *
- * Implementation: render the solid block at the same scale, then keep a filled
- * cell only when at least one of its 4-neighbours is empty (or off the grid).
- * Because it's derived from the solid render, it scales cleanly at any size and
- * stays perfectly aligned with the block style. Note: at scale 1 the glyphs are
- * too thin to have interiors, so the outline coincides with the solid block.
- *
- * @param fill character used for the outline strokes (default "█").
+ * For a filled cell we look at which of its four sides face an EMPTY cell (or
+ * the grid edge) — those are "walls". The bitmask is T=8 · B=4 · L=2 · R=1, and
+ * the chosen char draws the wall(s) so the union of all cells forms a clean
+ * line-art outline of the digit. Interior cells (no exposed walls) map to a
+ * blank, hollowing the glyph at EVERY scale.
  */
-export function renderOutlineLines(
-  time: string,
-  scale = 1,
-  fill = "█",
-): string[] {
+const OUTLINE_CHARS: Record<number, string> = {
+  0: " ", // interior → hollow
+  8: "─", 4: "─", 2: "│", 1: "│", // single wall
+  12: "─", 3: "│", // opposite walls (thin bar / thin column)
+  10: "┌", 9: "┐", 6: "└", 5: "┘", // corners (T+L, T+R, B+L, B+R)
+  14: "─", 13: "─", 11: "│", 7: "│", // three walls → follow the dominant axis
+  15: "▫", // isolated cell (e.g. colon dot)
+};
+
+/**
+ * Render a clock string as a HOLLOW / OUTLINE clock — the "outline" display
+ * style. It shares the exact geometry, scaling and dimensions of the solid
+ * `renderBigLines` (so the reserve-first layout maths are identical), but each
+ * glyph is drawn as airy line-art: every filled cell becomes a box-drawing
+ * character tracing the parts of its border that face empty space, and interior
+ * cells are blanked.
+ *
+ * Unlike the previous edge-detection approach (which coincided pixel-for-pixel
+ * with the solid block at scale 1–2 and only hollowed out at scale 3+, the
+ * source of the "invisible toggle / holes in a small window" bug), this reads
+ * as a distinct hollow glyph at EVERY scale — including scale 1 — because it
+ * emits box-drawing strokes instead of solid blocks.
+ */
+export function renderOutlineLines(time: string, scale = 1): string[] {
   const solid = renderBigLines(time, scale);
   const grid = solid.map((line) => [...line]);
+  const H = grid.length;
   const filled = (r: number, c: number): boolean =>
-    r >= 0 && r < grid.length && c >= 0 && c < (grid[r]?.length ?? 0) && grid[r]![c] === "█";
+    r >= 0 && r < H && c >= 0 && c < (grid[r]?.length ?? 0) && grid[r]![c] === "█";
 
   return grid.map((cells, r) =>
     cells
       .map((ch, c) => {
         if (ch !== "█") return " ";
-        // Interior cell: all four neighbours filled → hollow it out.
-        const isEdge =
-          !filled(r - 1, c) || !filled(r + 1, c) || !filled(r, c - 1) || !filled(r, c + 1);
-        return isEdge ? fill : " ";
+        const mask =
+          (filled(r - 1, c) ? 0 : 8) |
+          (filled(r + 1, c) ? 0 : 4) |
+          (filled(r, c - 1) ? 0 : 2) |
+          (filled(r, c + 1) ? 0 : 1);
+        return OUTLINE_CHARS[mask] ?? " ";
       })
       .join(""),
   );
@@ -253,12 +270,132 @@ export function computeSessionScale(
   areaCols: number,
   areaRows: number,
   time: string,
-  opts: { maxScale?: number } = {},
+  opts: { maxScale?: number; style?: DisplayStyle } = {},
 ): number {
-  const baseW = bigWidth(time, 1);
+  const style = opts.style ?? "block";
+  const baseW = styleWidth(style, time, 1);
   if (baseW === 0) return 1;
   const ws = Math.floor((areaCols * 0.92) / baseW);
-  const hs = Math.floor((areaRows * 0.95) / BIG_ROWS);
+  const hs = Math.floor((areaRows * 0.95) / styleBaseRows(style));
   const cap = opts.maxScale ?? 4;
   return Math.max(1, Math.min(ws, hs, cap));
+}
+
+// ---------------------------------------------------------------------------
+// Tall solid "classic" / "bold" fonts — terminal-style numerals
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-style glyph geometry. `block`/`simple`/`outline` share the original
+ * 5-row, 4-wide-digit footprint; `classic`/`bold` are taller (9 rows) solid
+ * letterforms. Threading these metrics through the scaling maths keeps the
+ * reserve-first layout exact for every style.
+ */
+interface StyleMetrics {
+  rows: number;
+  digitW: number;
+  colonW: number;
+}
+
+const STYLE_METRICS: Record<DisplayStyle, StyleMetrics> = {
+  block:   { rows: BIG_ROWS, digitW: 4, colonW: 1 },
+  simple:  { rows: BIG_ROWS, digitW: 4, colonW: 1 },
+  outline: { rows: BIG_ROWS, digitW: 4, colonW: 1 },
+  classic: { rows: 9, digitW: 5, colonW: 1 },
+  bold:    { rows: 9, digitW: 6, colonW: 2 },
+};
+
+/** Number of text rows the style occupies at scale 1. */
+export function styleBaseRows(style: DisplayStyle): number {
+  return STYLE_METRICS[style].rows;
+}
+
+/** Exact rendered width (cols) of `time` in `style` at the given scale. */
+export function styleWidth(style: DisplayStyle, time: string, scale = 1): number {
+  const m = STYLE_METRICS[style];
+  const chars = [...time];
+  let w = 0;
+  chars.forEach((ch, i) => {
+    w += ch === ":" ? m.colonW : m.digitW;
+    if (i < chars.length - 1) w += 1; // one-column gap between glyphs
+  });
+  return w * scale;
+}
+
+// 5-wide × 9-tall LIGHT letterforms (the `classic` style).
+const CLASSIC_GLYPHS: Record<string, string[]> = {
+  "0": [" ███ ", "█   █", "█   █", "█   █", "█   █", "█   █", "█   █", "█   █", " ███ "],
+  "1": ["  █  ", " ██  ", "  █  ", "  █  ", "  █  ", "  █  ", "  █  ", "  █  ", " ███ "],
+  "2": [" ███ ", "█   █", "    █", "    █", "   █ ", "  █  ", " █   ", "█    ", "█████"],
+  "3": [" ███ ", "█   █", "    █", "  ██ ", "    █", "    █", "    █", "█   █", " ███ "],
+  "4": ["   █ ", "  ██ ", " █ █ ", "█  █ ", "█████", "   █ ", "   █ ", "   █ ", "   █ "],
+  "5": ["█████", "█    ", "█    ", "████ ", "    █", "    █", "    █", "█   █", " ███ "],
+  "6": [" ███ ", "█   █", "█    ", "█    ", "████ ", "█   █", "█   █", "█   █", " ███ "],
+  "7": ["█████", "    █", "   █ ", "   █ ", "  █  ", "  █  ", " █   ", " █   ", " █   "],
+  "8": [" ███ ", "█   █", "█   █", "█   █", " ███ ", "█   █", "█   █", "█   █", " ███ "],
+  "9": [" ███ ", "█   █", "█   █", "█   █", " ████", "    █", "    █", "█   █", " ███ "],
+  ":": [" ", " ", "█", " ", " ", " ", "█", " ", " "],
+};
+
+// 6-wide × 9-tall HEAVY letterforms (the `bold` style).
+const BOLD_GLYPHS: Record<string, string[]> = {
+  "0": [" ████ ", "██  ██", "██  ██", "██  ██", "██  ██", "██  ██", "██  ██", "██  ██", " ████ "],
+  "1": ["  ██  ", " ███  ", "  ██  ", "  ██  ", "  ██  ", "  ██  ", "  ██  ", "  ██  ", " ████ "],
+  "2": [" ████ ", "██  ██", "    ██", "   ██ ", "  ██  ", " ██   ", "██    ", "██    ", "██████"],
+  "3": [" ████ ", "██  ██", "    ██", "  ███ ", "    ██", "    ██", "    ██", "██  ██", " ████ "],
+  "4": ["   ██ ", "  ███ ", " ████ ", "██ ██ ", "██████", "   ██ ", "   ██ ", "   ██ ", "   ██ "],
+  "5": ["██████", "██    ", "██    ", "█████ ", "    ██", "    ██", "    ██", "██  ██", " ████ "],
+  "6": [" ████ ", "██  ██", "██    ", "██    ", "█████ ", "██  ██", "██  ██", "██  ██", " ████ "],
+  "7": ["██████", "    ██", "   ██ ", "   ██ ", "  ██  ", "  ██  ", " ██   ", " ██   ", " ██   "],
+  "8": [" ████ ", "██  ██", "██  ██", "██  ██", " ████ ", "██  ██", "██  ██", "██  ██", " ████ "],
+  "9": [" ████ ", "██  ██", "██  ██", "██  ██", " █████", "    ██", "    ██", "██  ██", " ████ "],
+  ":": ["  ", "  ", "██", "██", "  ", "██", "██", "  ", "  "],
+};
+
+/**
+ * Render a 9-row solid-letterform font (classic/bold) by integer cell-repeat —
+ * crisp at every scale, no half-block artefacts. Width parity with
+ * `styleWidth` is guaranteed by the glyph tables matching STYLE_METRICS.
+ */
+function renderTallSolid(
+  time: string,
+  scale: number,
+  glyphs: Record<string, string[]>,
+  rows: number,
+  digitW: number,
+): string[] {
+  const H = rows * scale;
+  const out = Array.from({ length: H }, () => "");
+  const chars = [...time];
+  const blank = Array.from({ length: rows }, () => " ".repeat(digitW));
+  chars.forEach((ch, idx) => {
+    const g = glyphs[ch] ?? blank;
+    const sep = idx < chars.length - 1 ? " ".repeat(scale) : "";
+    for (let r = 0; r < rows; r++) {
+      const line = [...(g[r] ?? "")].map((c) => c.repeat(scale)).join("");
+      for (let s = 0; s < scale; s++) out[r * scale + s] += line + sep;
+    }
+  });
+  return out;
+}
+
+/** Render the `classic` style — tall LIGHT solid terminal numerals. */
+export function renderClassicLines(time: string, scale = 1): string[] {
+  return renderTallSolid(time, scale, CLASSIC_GLYPHS, STYLE_METRICS.classic.rows, STYLE_METRICS.classic.digitW);
+}
+
+/** Render the `bold` style — tall HEAVY solid terminal numerals. */
+export function renderBoldLines(time: string, scale = 1): string[] {
+  return renderTallSolid(time, scale, BOLD_GLYPHS, STYLE_METRICS.bold.rows, STYLE_METRICS.bold.digitW);
+}
+
+/** Render `time` in the requested display style at the given scale. */
+export function renderCounter(style: DisplayStyle, time: string, scale = 1): string[] {
+  switch (style) {
+    case "simple":  return renderSimpleLines(time, scale);
+    case "outline": return renderOutlineLines(time, scale);
+    case "classic": return renderClassicLines(time, scale);
+    case "bold":    return renderBoldLines(time, scale);
+    default:        return renderBigLines(time, scale);
+  }
 }

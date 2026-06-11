@@ -40,7 +40,7 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
 
   // Session controls
   body.push(padTo("Session controls (while a session runs):", innerW));
-  body.push(padTo("p pause/resume · b break on/off · 1-6 break category · r reset · q stop & save", innerW));
+  body.push(padTo("p pause · b break · 1-6 category · z zen · Enter hide controls · r reset · q stop & save", innerW));
   body.push(padTo("categories: 1 rest · 2 meal · 3 exercise · 4 walk · 5 distraction · 6 other", innerW));
 
   // Spacer
@@ -48,8 +48,8 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
 
   // Global
   body.push(padTo("Global:", innerW));
-  body.push(padTo("/ command palette · d display style (block/simple/outline) · t theme · r refresh · q/Esc quit", innerW));
-  body.push(padTo("d and t are saved as your default; both are also in the / palette.", innerW));
+  body.push(padTo("/ command palette · d display style (block/simple/outline/classic/bold) · t theme · r refresh · q/Esc quit", innerW));
+  body.push(padTo("Sessions list: Supr deletes (with confirm). d/t saved as default; both also in the / palette.", innerW));
 
   // Spacer
   body.push("");

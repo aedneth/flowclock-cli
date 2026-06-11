@@ -17,11 +17,9 @@ import { paint, THEME_FG } from "../../lib/theme.js";
 import { humanDuration } from "../../lib/format.js";
 import { breakRatio } from "../../lib/flowtime.js";
 import {
-  renderBigLines,
-  renderSimpleLines,
-  renderOutlineLines,
-  bigWidth,
-  BIG_ROWS,
+  renderCounter,
+  styleWidth,
+  styleBaseRows,
   computeSessionScale,
 } from "../../lib/bigfont.js";
 import type { DisplayStyle } from "../../schemas/config.js";
@@ -43,16 +41,8 @@ export interface SessionViewState {
   suggestedBreakS: number | null;  // proportional suggestion
   focusTargetS: number | null;
   breakBudgetS: number | null;
-  zen: boolean;                    // hide footer + progress chrome (clock only)
-  showControls: boolean;           // show the footer (overridden false by zen)
-  displayStyle: DisplayStyle;      // "block" solid · "simple" line digits · "outline" hollow
-  keybindings: {
-    pause: string;
-    reset: string;
-    quit: string;
-    break: string;
-    category: string;
-  };
+  zen: boolean;                    // hide goal + metadata (hero clock only)
+  displayStyle: DisplayStyle;      // block · simple · outline · classic · bold
 }
 
 // ---------------------------------------------------------------------------
@@ -100,18 +90,21 @@ export function renderSession(
   // ── ACTIVE ───────────────────────────────────────────────────────────────
   const { goal, label, focusS, totalBreakS, focusTargetS, breakBudgetS,
           onBreak, currentBreakS, breakCategory, suggestedBreakS,
-          zen, showControls, displayStyle, keybindings: kb, time } = state;
+          zen, displayStyle, time } = state;
 
   // -- Top lines (goal/label) -----------------------------------------------
+  // The goal sits CENTERED above the counter; hidden entirely in zen mode.
   const topLines: string[] = [];
   const goalText = goal ?? label;
-  if (goalText) {
+  if (goalText && !zen) {
     const text = color ? paint(goalText, theme, true) : goalText;
-    topLines.push(padTo(text, innerW));
+    topLines.push(padTo(text, innerW, "center"));
   }
 
-  // -- Bottom lines (progress + footer) -------------------------------------
-  // In zen mode we suppress all chrome below the counter.
+  // -- Bottom lines (progress / break metadata) -----------------------------
+  // CENTERED below the counter; suppressed entirely in zen mode. The control
+  // hints live ONLY in the dashboard's global footer (app.ts) — the panel no
+  // longer renders its own footer, so the two never duplicate.
   const bottomLines: string[] = [];
 
   if (!zen) {
@@ -123,7 +116,7 @@ export function renderSession(
       const won = focusS >= focusTargetS && (breakBudgetS == null || totalBreakS <= breakBudgetS);
       const prefix = won ? "✦ " : "";
       const progressLine = `${prefix}focus ${humanDuration(focusS)}/${humanDuration(focusTargetS)}  ▕${bar}▏ ${pct}%`;
-      bottomLines.push(padTo(progressLine, innerW));
+      bottomLines.push(padTo(progressLine, innerW, "center"));
     }
 
     // Break summary line
@@ -134,7 +127,7 @@ export function renderSession(
         const r = breakRatio(focusS, totalBreakS);
         breakLine += ` · ratio 1:${r.toFixed(1)}`;
       }
-      bottomLines.push(padTo(breakLine, innerW));
+      bottomLines.push(padTo(breakLine, innerW, "center"));
     }
 
     // On-break status line
@@ -143,18 +136,7 @@ export function renderSession(
       if (suggestedBreakS != null) {
         onBreakLine += `  (sug ${fmtMS(suggestedBreakS)})`;
       }
-      bottomLines.push(padTo(onBreakLine, innerW));
-    }
-
-    // Footer / controls line
-    if (showControls) {
-      let footerLine: string;
-      if (onBreak) {
-        footerLine = `[1]rest [2]meal [3]exercise [4]walk [5]distraction [6]other  [${kb.break}] resume`;
-      } else {
-        footerLine = `[${kb.pause}] pause · [${kb.break}] break · [1-6] cat · [${kb.reset}] reset · [${kb.quit}] stop`;
-      }
-      bottomLines.push(padTo(footerLine, innerW));
+      bottomLines.push(padTo(onBreakLine, innerW, "center"));
     }
   }
 
@@ -165,10 +147,13 @@ export function renderSession(
   const topGap = topLines.length > 0 ? 1 : 0;       // blank row after top lines
   const bottomGap = bottomLines.length > 0 ? 1 : 0;  // blank row before bottom lines
   const reserved = topLines.length + topGap + bottomLines.length + bottomGap;
-  const counterAreaRows = Math.max(BIG_ROWS, innerH - reserved);
+  const counterAreaRows = Math.max(styleBaseRows(displayStyle), innerH - reserved);
 
-  // Determine whether the big counter fits even at scale=1
-  const fitsAtScaleOne = innerW >= bigWidth(time, 1) && (innerH - reserved) >= BIG_ROWS;
+  // Determine whether the counter fits even at scale=1 (style-aware: the tall
+  // classic/bold fonts need more rows than block/simple/outline).
+  const fitsAtScaleOne =
+    innerW >= styleWidth(displayStyle, time, 1) &&
+    innerH - reserved >= styleBaseRows(displayStyle);
 
   let counterLines: string[];
 
@@ -179,21 +164,15 @@ export function renderSession(
     const line = color ? `${THEME_FG[theme]}${raw}${RESET}` : raw;
     counterLines = [line];
   } else {
-    const scale = computeSessionScale(innerW, counterAreaRows, time);
-    // All three styles share block's exact scale/dimensions (reserve-first math
-    // is identical); they differ only in glyph rendering:
-    //   "simple"  → clean heavy box-drawing seven-segment digits (line art),
-    //               distinct from block at EVERY scale incl. 1, so toggling is
-    //               visible even in small / tiled windows.
-    //   "outline" → hollow edge-traced block glyphs (coincides with block at
-    //               scale 1; hollows out as it grows).
-    //   "block"   → solid glyphs (default).
-    const rawLines =
-      displayStyle === "simple"
-        ? renderSimpleLines(time, scale)
-        : displayStyle === "outline"
-          ? renderOutlineLines(time, scale)
-          : renderBigLines(time, scale);
+    const scale = computeSessionScale(innerW, counterAreaRows, time, { style: displayStyle });
+    // Every style shares the reserve-first scaling maths via style-aware metrics
+    // (styleWidth / styleBaseRows); they differ only in glyph rendering:
+    //   "block"   solid block glyphs (default)
+    //   "simple"  clean heavy box-drawing seven-segment line digits
+    //   "outline" hollow box-drawing line-art digits (distinct at every scale)
+    //   "classic" tall LIGHT solid terminal numerals
+    //   "bold"    tall HEAVY solid terminal numerals
+    const rawLines = renderCounter(displayStyle, time, scale);
     counterLines = rawLines.map((line) => {
       const padded = padTo(line, innerW, "center");
       return color ? `${THEME_FG[theme]}${padded}${RESET}` : padded;
