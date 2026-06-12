@@ -223,7 +223,7 @@ export function renderSession(
     //   "simple"  clean heavy box-drawing seven-segment line digits
     //   "outline" double-line box-drawing silhouette digits
     //   "minimal" light box-drawing seven-segment line digits
-    //   "classic" solid LIGHT shade ▒ terminal numerals
+    //   "classic" solid LIGHT shade ░ terminal numerals
     //   "bold"    solid HEAVY shade ▓ terminal numerals
     const rawLines = renderCounter(plan.style, time, scale);
     counterLines = rawLines.map((line) => {

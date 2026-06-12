@@ -347,7 +347,7 @@ export function uniformCounterScale(
  * 1-wide-colon footprint, so the reserve-first scaling maths and small-panel
  * fallback thresholds are byte-for-byte identical across all six styles. The
  * styles differ only in how each filled cell is INKED (see `renderCounter`):
- * `block` full `█`, `classic`/`bold` the lighter `▒` / heavier `▓` shade
+ * `block` full `█`, `classic`/`bold` the light `░` / heavy `▓` shade
  * weights, and `simple`/`outline`/`minimal` box-drawing line-art.
  */
 interface StyleMetrics {
@@ -383,7 +383,7 @@ export function styleWidth(style: DisplayStyle, time: string, scale = 1): number
 }
 
 /** The shade glyph each solid weight inks its filled cells with. */
-const CLASSIC_FILL = "▒"; // light/medium shade — the `classic` weight
+const CLASSIC_FILL = "░"; // light shade — the airy `classic` weight (clearly distinct from solid block)
 const BOLD_FILL = "▓"; // heavy shade — the `bold` weight
 
 /**
@@ -391,14 +391,14 @@ const BOLD_FILL = "▓"; // heavy shade — the `bold` weight
  * `bold` are weight variants of the default `block` font: they share its EXACT
  * 5-row × 4-col cell grid (so every dimension, scale step and layout reservation
  * is byte-for-byte identical to block), and differ only by inking each filled
- * cell with a lighter `▒` / heavier `▓` shade instead of the full `█`. Reusing
+ * cell with a light `░` / heavy `▓` shade instead of the full `█`. Reusing
  * `renderBigLines` guarantees the footprint can never drift from block's.
  */
 function renderShaded(time: string, scale: number, fill: string): string[] {
   return renderBigLines(time, scale).map((line) => line.replaceAll("█", fill));
 }
 
-/** Render the `classic` style — solid LIGHT shade (`▒`) terminal numerals. */
+/** Render the `classic` style — solid LIGHT shade (`░`) terminal numerals. */
 export function renderClassicLines(time: string, scale = 1): string[] {
   return renderShaded(time, scale, CLASSIC_FILL);
 }

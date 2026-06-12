@@ -6,6 +6,28 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.5.1] - 2026-06-12
+
+### Changed
+
+- **`classic`'s fill lightened from `▒` to `░` (U+2591 LIGHT SHADE), making
+  the three solid styles read as clearly distinct surfaces when cycling with
+  `d`: block `█` (full) / classic `░` (light shade) / bold `▓` (dark shade).**
+  At the locked 5-row × 4-col footprint there is only one readable solid digit
+  shape, so the distinction between solid styles is necessarily by fill texture;
+  `░` / `█` / `▓` is the strongest three-way split available. `bold` stays `▓`
+  (unchanged). `block` stays `█` (unchanged). Footprint parity, dimensions,
+  scaling, and small-window rendering are all identical to v3.5.0 — this is a
+  texture-only refinement.
+
+### Fixed
+
+- **Cycling `d` through `classic`/`bold` no longer looks like no change is
+  happening.** In v3.5.0, `classic` (`▒`) and `bold` (`▓`) both sat visually
+  close to `block` (`█`), so alternating among the three solid styles produced
+  no observable difference in a running session. Lightening `classic` to `░`
+  opens a clear perceptual gap between all three.
+
 ## [3.5.0] - 2026-06-11
 
 ### Changed
@@ -385,7 +407,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.5.0...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.5.1...HEAD
+[3.5.1]: https://github.com/aedneth/flowclock-cli/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/aedneth/flowclock-cli/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/aedneth/flowclock-cli/compare/v3.4.0...v3.4.1
 [3.4.0]: https://github.com/aedneth/flowclock-cli/compare/v3.3.1...v3.4.0
