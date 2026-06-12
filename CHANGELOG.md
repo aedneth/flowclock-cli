@@ -6,6 +6,29 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.6.0] - 2026-06-12
+
+### Changed
+
+- **`classic` and `bold` redesigned as NATIVE 5-row fonts with distinct glyph
+  shapes — no longer the `block` font re-inked with shade characters.** `classic`
+  now draws cornered, open "rounded-terminal" numerals; `bold` draws heavy-slab
+  numerals with filled corners. Both are inked with solid `█` and distinguished
+  from `block` (and from each other) by GLYPH SHAPE and stroke weight, so cycling
+  the three solid styles with `d` shows a clear, unambiguous change. They keep the
+  exact 5-row × 4-col `block` footprint, so cycling never shifts the layout and
+  both render their own glyphs at every window size — including a minimized window
+  with session metadata — with no fallback to `block` and no towering.
+
+### Fixed
+
+- **`classic`/`bold` no longer look almost identical to `block` when cycling.** In
+  v3.5.0–v3.5.1 the two styles were `block` re-inked with `░` / `▓` shades, which
+  read too close to the full `█` block (bold especially), so alternating among the
+  three solid styles produced little observable change. Distinct glyph shapes
+  replace the shade approach, which was geometrically incapable of differentiating
+  three solid styles at the locked 5×4 footprint.
+
 ## [3.5.1] - 2026-06-12
 
 ### Changed
@@ -407,7 +430,8 @@ ANSI, zero new runtime dependencies, instant cold start.
   `FLOWCLOCK_CONFIG_DIR` / `FLOWCLOCK_DATA_DIR` overrides.
 - Color themes: `neon` (default), `amber`, `blue`, `mono`.
 
-[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.5.1...HEAD
+[Unreleased]: https://github.com/aedneth/flowclock-cli/compare/v3.6.0...HEAD
+[3.6.0]: https://github.com/aedneth/flowclock-cli/compare/v3.5.1...v3.6.0
 [3.5.1]: https://github.com/aedneth/flowclock-cli/compare/v3.5.0...v3.5.1
 [3.5.0]: https://github.com/aedneth/flowclock-cli/compare/v3.4.1...v3.5.0
 [3.4.1]: https://github.com/aedneth/flowclock-cli/compare/v3.4.0...v3.4.1
