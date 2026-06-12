@@ -49,14 +49,15 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
   // Global
   body.push(padTo("Global:", innerW));
   body.push(padTo("/ command palette · d display style (block/simple/outline/minimal/classic/bold) · t theme · r refresh · q/Esc quit", innerW));
-  body.push(padTo("Sessions list: Supr deletes (with confirm). d/t saved as default; both also in the / palette.", innerW));
+  body.push(padTo("Sessions list: Enter detail · e edit (focus/break/goal/name; end + timeline recompute) · Supr delete.", innerW));
+  body.push(padTo("d/t saved as default; both also in the / palette.", innerW));
 
   // Spacer
   body.push("");
 
   // Commands
   body.push(padTo("Commands (also from your shell):", innerW));
-  body.push(padTo("start · stats · history · goals · summary · breaks · theme · config · doctor · dashboard", innerW));
+  body.push(padTo("start · log · edit · stats · history · goals · summary · breaks · theme · config · doctor · dashboard", innerW));
 
   // Spacer
   body.push("");

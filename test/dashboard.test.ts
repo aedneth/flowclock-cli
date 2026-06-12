@@ -28,6 +28,7 @@ import { buildFrame, compositeOverlay } from "../src/tui/app.js";
 import type { LiveSession, ViewName } from "../src/tui/app.js";
 import { emptyPaletteState } from "../src/tui/palette.js";
 import { emptySessionFormState } from "../src/tui/sessionform.js";
+import { emptyEditFormState, openEditFormState } from "../src/tui/editform.js";
 import { emptyConfirmState, openConfirmState } from "../src/tui/confirm.js";
 import type { ConfirmState } from "../src/tui/confirm.js";
 
@@ -645,6 +646,7 @@ describe("buildFrame (WS5)", () => {
       summary: null,
       theme: "neon" as const,
       form: emptySessionFormState(),
+      edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
       zenLive: false,
@@ -679,6 +681,7 @@ describe("buildFrame (WS5)", () => {
       summary: null,
       theme: "neon" as const,
       form: emptySessionFormState(),
+      edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
       zenLive: false,
@@ -713,6 +716,7 @@ describe("buildFrame (WS5)", () => {
       summary: null,
       theme: "neon" as const,
       form: emptySessionFormState(),
+      edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
       zenLive: false,
@@ -729,6 +733,7 @@ describe("buildFrame (WS5)", () => {
     zenLive?: boolean;
     hideControls?: boolean;
     confirm?: ConfirmState;
+    edit?: ReturnType<typeof emptyEditFormState>;
   } = {}) {
     const live: LiveSession | null =
       opts.live === undefined
@@ -745,6 +750,7 @@ describe("buildFrame (WS5)", () => {
       summary: null,
       theme: "neon" as const,
       form: emptySessionFormState(),
+      edit: opts.edit ?? emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: opts.confirm ?? emptyConfirmState(),
       zenLive: opts.zenLive ?? false,
@@ -791,6 +797,31 @@ describe("buildFrame (WS5)", () => {
     expect(out).toContain("Supr");
   });
 
+  it("sessions view footer advertises the [e] edit hint", () => {
+    const out = buildFrame(fcState({ view: "sessions", live: null }), 100, 24, makeFakeCtx())
+      .map(stripAnsi)
+      .join("\n");
+    expect(out).toContain("[e] edit");
+  });
+
+  it("edit overlay renders the Edit session panel + save footer", () => {
+    const edit = openEditFormState({
+      sessionId: "sess-x",
+      startISO: "2026-06-12T03:00:00.000Z",
+      values: { goal: "Korvex", label: "", focus: "1h30m00s", break: "20m00s" },
+    });
+    const out = buildFrame(
+      fcState({ view: "sessions", live: null, edit }),
+      100,
+      24,
+      makeFakeCtx(),
+    ).map(stripAnsi).join("\n");
+    expect(out).toContain("Edit session");
+    expect(out).toContain("Focus");
+    expect(out).toContain("End →");
+    expect(out).toContain("[Enter] save");
+  });
+
   it("palette open — frame contains 'Commands' panel title", () => {
     const ctx = makeFakeCtx();
     const state = {
@@ -804,6 +835,7 @@ describe("buildFrame (WS5)", () => {
       summary: null,
       theme: "neon" as const,
       form: emptySessionFormState(),
+      edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
       zenLive: false,
@@ -827,6 +859,7 @@ describe("buildFrame (WS5)", () => {
       summary: null,
       theme: "neon" as const,
       form: emptySessionFormState(),
+      edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
       zenLive: false,
@@ -850,6 +883,7 @@ describe("buildFrame (WS5)", () => {
       summary: null,
       theme: "neon" as const,
       form: emptySessionFormState(),
+      edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
       zenLive: false,
@@ -873,6 +907,7 @@ describe("buildFrame (WS5)", () => {
       summary: null,
       theme: "neon" as const,
       form: emptySessionFormState(),
+      edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
       zenLive: false,

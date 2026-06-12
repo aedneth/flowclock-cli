@@ -11,6 +11,23 @@ export function humanDuration(totalSeconds: number): string {
 }
 
 /**
+ * Compact, parser-friendly duration like "1h30m00s" / "30m00s" / "45s".
+ *
+ * Unlike `humanDuration`, the output contains NO spaces, so it round-trips
+ * straight back through `parseDurationToS` — used to pre-fill editable duration
+ * fields (e.g. the dashboard edit form). `0` seconds renders as "0s".
+ */
+export function compactDuration(totalSeconds: number): string {
+  const s = Math.max(0, Math.floor(totalSeconds));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const sec = s % 60;
+  if (h > 0) return `${h}h${String(m).padStart(2, "0")}m${String(sec).padStart(2, "0")}s`;
+  if (m > 0) return `${m}m${String(sec).padStart(2, "0")}s`;
+  return `${sec}s`;
+}
+
+/**
  * Parse a human duration string into whole seconds.
  *
  * Accepted forms:

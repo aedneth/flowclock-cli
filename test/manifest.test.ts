@@ -15,6 +15,7 @@ describe("manifest", () => {
         "config",
         "dashboard",
         "doctor",
+        "edit",
         "goals",
         "history",
         "log",

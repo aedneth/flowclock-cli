@@ -13,11 +13,11 @@ import type { Session } from "../schemas/session.js";
 import type { ThemeName, DisplayStyle } from "../schemas/config.js";
 import type { BreakCategory } from "../schemas/session.js";
 import { buildSnapshot } from "../lib/snapshot.js";
-import { readSessions, appendSession, deleteSession } from "../lib/session.js";
+import { readSessions, appendSession, deleteSession, updateSession } from "../lib/session.js";
 import { sessionsPathFor, saveConfig } from "../lib/config.js";
 import { Timer } from "../lib/timer.js";
 import { suggestBreakS } from "../lib/flowtime.js";
-import { humanDuration, parseDurationToS } from "../lib/format.js";
+import { humanDuration, compactDuration, parseDurationToS } from "../lib/format.js";
 import { Screen } from "../lib/tui/screen.js";
 import { startNavReader } from "../lib/tui/input.js";
 import { splitV } from "../lib/tui/layout.js";
@@ -52,6 +52,13 @@ import {
   renderConfirm,
 } from "./confirm.js";
 import type { ConfirmState } from "./confirm.js";
+import {
+  emptyEditFormState,
+  openEditFormState,
+  editFormApplyKey,
+  renderEditForm,
+} from "./editform.js";
+import type { EditFormState, EditFormValues } from "./editform.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -116,6 +123,7 @@ interface AppState {
   live: LiveSession | null;
   palette: PaletteState;
   form: SessionFormState;
+  edit: EditFormState;
   confirm: ConfirmState;
   summary: SummaryState | null;
   theme: ThemeName;
@@ -348,6 +356,8 @@ export function buildFrame(
     footerHints = "[y] confirm · [n] cancel";
   } else if (state.form.open) {
     footerHints = "[Tab] next field · [Enter] start · [Esc] cancel";
+  } else if (state.edit.open) {
+    footerHints = "[Tab] next field · [Enter] save · [Esc] cancel";
   } else if (state.palette.open) {
     footerHints = "[↑↓] select · [Enter] run · [Esc] cancel";
   } else if (state.live && state.view === "session") {
@@ -365,7 +375,7 @@ export function buildFrame(
   } else if (state.live) {
     footerHints = `[Tab]/[1-6] views · session ● ${state.live.timer.display()} running · [d] style · [Ctrl-C] quit`;
   } else if (state.view === "sessions") {
-    footerHints = "[↑↓] select · [Enter] detail · [Supr] delete · [Tab] views · [q] quit";
+    footerHints = "[↑↓] select · [Enter] detail · [e] edit · [Supr] delete · [Tab] views · [q] quit";
   } else {
     footerHints = "[Tab] views · [s] start · [/] commands · [d] style · [t] theme · [q] quit";
   }
@@ -393,6 +403,12 @@ export function buildFrame(
   if (state.form.open) {
     const formOverlay = renderSessionForm(state.form, cols, rows, theme, color);
     return compositeOverlay(baseFrame, formOverlay, cols);
+  }
+
+  // Edit-session form overlay
+  if (state.edit.open) {
+    const editOverlay = renderEditForm(state.edit, cols, rows, theme, color);
+    return compositeOverlay(baseFrame, editOverlay, cols);
   }
 
   // Palette overlay
@@ -481,6 +497,7 @@ export async function runDashboardApp(
       live: null,
       palette: emptyPaletteState(),
       form: emptySessionFormState(),
+      edit: emptyEditFormState(),
       confirm: emptyConfirmState(),
       summary: null,
       theme: ctx.config.theme,
@@ -697,6 +714,59 @@ export async function runDashboardApp(
       render();
     }
 
+    /**
+     * Open the edit form for the currently-selected session, pre-filled with its
+     * goal/name and its focus/break totals in a parser-friendly compact form.
+     */
+    function openEditForm() {
+      const snap = buildSnapshot(state.sessions, ctx.config.dailyFocusGoalS);
+      const session = snap.recent[state.selectedIndex];
+      if (!session) return;
+      state.edit = openEditFormState({
+        sessionId: session.id,
+        startISO: session.start,
+        values: {
+          goal: session.goal ?? "",
+          label: session.label ?? "",
+          focus: compactDuration(session.durationS),
+          break: compactDuration(session.breakS),
+        },
+      });
+      render();
+    }
+
+    /**
+     * Persist an edit from the form's values. Parses the focus/break durations
+     * (blank = keep the original total); on a parse error, surfaces it in the
+     * form and stays open. The end timestamp + break timeline recompute
+     * automatically via `updateSession` → `recomputeSession`.
+     */
+    function saveEditForm(sessionId: string, values: EditFormValues) {
+      let focusS: number | undefined;
+      let breakS: number | undefined;
+      try {
+        if (values.focus.trim()) focusS = parseDurationToS(values.focus);
+        if (values.break.trim()) breakS = parseDurationToS(values.break);
+      } catch (err) {
+        state.edit = { ...state.edit, error: (err as Error).message };
+        render();
+        return;
+      }
+
+      updateSession(file, sessionId, {
+        focusS,
+        breakS,
+        goal: values.goal.trim() || null,
+        label: values.label.trim() || null,
+      });
+
+      const { sessions: fresh } = readSessions(file);
+      state.sessions = fresh;
+      state.edit = emptyEditFormState();
+      clampSelection();
+      render();
+    }
+
     /** Execute a palette command by name, then close the palette. */
     function executePaletteCommand(commandName: string) {
       state.palette = emptyPaletteState();
@@ -829,6 +899,28 @@ export async function runDashboardApp(
         }
         if (result.action?.type === "submit") {
           startSessionFromForm(result.action.values);
+          return;
+        }
+        render();
+        return;
+      }
+
+      // ── (1c) Edit-session form: feed keys to its reducer ──────────────────
+      if (state.edit.open) {
+        // Ctrl-C closes the edit modal (never edits) without exiting the app.
+        if (key.name === "char" && key.char === CTRL_C) {
+          state.edit = emptyEditFormState();
+          render();
+          return;
+        }
+        const result = editFormApplyKey(state.edit, key);
+        state.edit = result.state;
+        if (result.action?.type === "cancel") {
+          render();
+          return;
+        }
+        if (result.action?.type === "submit") {
+          saveEditForm(result.action.sessionId, result.action.values);
           return;
         }
         render();
@@ -1009,6 +1101,12 @@ export async function runDashboardApp(
         // Cycle theme — works anywhere, persisted.
         if (ch === "t") {
           cycleTheme();
+          return;
+        }
+
+        // Edit the selected session (sessions view, list or detail).
+        if (ch === "e" && state.view === "sessions") {
+          openEditForm();
           return;
         }
 

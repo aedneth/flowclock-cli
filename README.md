@@ -280,7 +280,10 @@ While a session runs, the **global footer** is the single source of control hint
 - **`Enter`** — hide/show the controls row to remove visual noise once memorised.
 - **`p`** pause · **`b`** break · **`1`–`6`** category · **`r`** reset · **`q`** stop & save.
 
-On the **Sessions** list, **`Supr`/`Delete`** opens a confirmation modal
+On the **Sessions** list, **`e`** opens an Edit-session overlay to change the
+focus duration, break total, goal, or name for the selected session; the start
+timestamp is immutable and the end + break timeline recompute automatically.
+**`Supr`/`Delete`** opens a confirmation modal
 (`[y] confirm · [n] cancel`) to delete the selected session from `sessions.json`.
 
 ### Command palette
@@ -296,6 +299,7 @@ a permanent bar** — it appears only when invoked and disappears when you press
 [s] / [n]      new session     [Enter]        detail / start · hide controls (live)
 [d]            display style   [t]            theme (both saved)
 [z]            zen (live)      [Supr]         delete session (Sessions · confirm)
+[e]            edit session (Sessions · focus/break/goal/name)
 [/]            command palette [r]            refresh
 [q] / [Esc]    quit / close overlay
 ```
@@ -369,6 +373,7 @@ Every interactive flow has a non-interactive equivalent, so terminal AI agents
 ```bash
 flowclock log --duration 3000 --goal "Deep work" \
               --target 1h --break-budget 20m --json   # record a full session
+flowclock edit <id> --focus 90m --json                # fix a session that ran while you slept
 flowclock dashboard --json | jq .data.game            # the whole snapshot, no TTY
 flowclock stats --json | jq .data.game.flowScore      # compose with pipes
 echo "$SESSION_JSON" | flowclock log --json           # accept session JSON on stdin
@@ -377,6 +382,8 @@ flowclock mcp                                          # MCP server over stdio
 ```
 
 - **`--json`** on every command, with a stable, versioned envelope.
+- **`flowclock edit`** — the start timestamp is immutable; end and the break
+  timeline recompute automatically from the new focus + break values.
 - **`--yes`** skips prompts; **`--no-color`** / `NO_COLOR` for clean output.
 - **Deterministic exit codes** (below) — the contract agents branch on.
 - **No hidden TTY requirements:** non-TTY runs default to machine-friendly mode; the
@@ -439,6 +446,7 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v3.5.0** ✅ | `classic`/`bold` redesigned as 5-row shade weights (`▒`/`▓`) for exact footprint parity with all styles — no more towering, goal covering, or silent fallback to `block` |
 | **v3.5.1** ✅ | `classic` lightened to `░` shade so block `█` / classic `░` / bold `▓` read as three distinct surfaces while keeping exact 5-row footprint parity |
 | **v3.6.0** ✅ | `classic`/`bold` redesigned as native 5-row fonts with distinct glyph shapes (cornered `classic` / heavy-slab `bold`, both solid) — replaces the v3.5.x shade-fill approach so the three solid styles read as clearly distinct while keeping exact footprint parity |
+| **v3.7.0** ✅ | Session editing — in-dashboard `[e]` overlay (view 3 · Sessions) and `flowclock edit <id>` CLI; editable fields: focus, break total, goal, name; start immutable; end + break timeline recompute automatically |
 | **next** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 

@@ -33,7 +33,12 @@ jobs:
         run: npm ci --ignore-scripts
 
       - name: Dependency security audit
-        run: npm audit --audit-level=high
+        # Scope to production deps: the published package ships no build tooling
+        # (esbuild/tsup/vite are devDependencies, never installed by users), so
+        # dev-only advisories must not block a release. `--omit=dev` audits
+        # exactly what users install. Run a full `npm audit` locally for dev-tool
+        # advisories.
+        run: npm audit --audit-level=high --omit=dev
 
       - name: Lint
         run: npm run lint

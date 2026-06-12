@@ -93,6 +93,43 @@ describe("flowclock CLI", () => {
     );
   });
 
+  it("edits a logged session's focus and recomputes the end", () => {
+    // Log a 6h "runaway" session, then correct focus down to 90m.
+    const logged = JSON.parse(
+      run(["log", "--duration", "21600", "--goal", "Sleepy", "--json"]).stdout,
+    );
+    const id = logged.data.id as string;
+    const edited = run(["edit", id, "--focus", "90m", "--json"]);
+    expect(edited.status).toBe(0);
+    const rec = JSON.parse(edited.stdout);
+    expect(rec.ok).toBe(true);
+    expect(rec.command).toBe("edit");
+    expect(rec.data.durationS).toBe(5400);
+    // history reflects the corrected duration
+    const hist = JSON.parse(run(["history", "--json"]).stdout);
+    expect(hist.data.sessions[0].durationS).toBe(5400);
+  });
+
+  it("edit accepts a unique id prefix and edits the goal/name", () => {
+    const logged = JSON.parse(run(["log", "--duration", "600", "--json"]).stdout);
+    const id = logged.data.id as string;
+    const r = run(["edit", id.slice(0, 10), "--goal", "Renamed", "--name", "Tag", "--json"]);
+    expect(r.status).toBe(0);
+    const rec = JSON.parse(r.stdout);
+    expect(rec.data.goal).toBe("Renamed");
+    expect(rec.data.label).toBe("Tag");
+  });
+
+  it("edit with no fields exits USAGE (2)", () => {
+    const logged = JSON.parse(run(["log", "--duration", "600", "--json"]).stdout);
+    expect(run(["edit", logged.data.id, "--json"]).status).toBe(2);
+  });
+
+  it("edit with an unknown id exits USAGE (2)", () => {
+    run(["log", "--duration", "600", "--json"]);
+    expect(run(["edit", "no-such-id", "--focus", "10m", "--json"]).status).toBe(2);
+  });
+
   it("exits NO_TTY (5) when start has no TTY and no --duration", () => {
     expect(run(["start", "--json"]).status).toBe(5);
   });

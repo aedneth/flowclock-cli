@@ -202,6 +202,39 @@ export function buildManifest(): Manifest {
         examples: ["flowclock log --duration 600 --label deep-work --json"],
       },
       {
+        name: "edit",
+        summary:
+          "Surgically edit a logged session's essential values (focus/break/goal/name) by id or unique id prefix. The start is immutable; end + break timeline recompute automatically. Focus changes trim from the tail; breaks stay as recorded unless --break is given.",
+        args: ["<id>"],
+        flags: [
+          {
+            name: "--focus",
+            type: "string",
+            description: "New active focus time, e.g. 1h30m, 90m, 45s.",
+          },
+          {
+            name: "--break",
+            type: "string",
+            description: "New total break time, e.g. 20m (0 clears all breaks).",
+          },
+          {
+            name: "--goal",
+            type: "string",
+            description: "New goal/intention (empty string clears it).",
+          },
+          {
+            name: "--name",
+            type: "string",
+            description: "New session name/label (empty string clears it).",
+          },
+        ],
+        jsonData: "The updated Session record (v3 schema) with recomputed end + breaks[].",
+        examples: [
+          "flowclock edit 2026-06-12T03-15 --focus 90m --json",
+          "flowclock edit <id> --break 0 --goal 'Deep work'",
+        ],
+      },
+      {
         name: "stats",
         summary:
           "Aggregate stats: today total, count, best, average, last 7 days.",
