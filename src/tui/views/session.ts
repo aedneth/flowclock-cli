@@ -80,7 +80,8 @@ interface CounterPlan {
  *      centered text line.
  *
  * EVERY style now shares the exact 5-row × 4-col `block` footprint (`classic`/
- * `bold` are shade-weight variants of block, not the old taller letterforms), so
+ * `bold` are native 5-row letterforms with distinct glyph shapes — cornered
+ * `classic` / heavy-slab `bold` — not the old taller 9-row letterforms), so
  * the requested style renders at every window size the others do. There is no
  * tall-font case and no fall-back to a different style: cycling styles never
  * changes the counter's footprint, and classic/bold are never silently swapped
@@ -223,8 +224,8 @@ export function renderSession(
     //   "simple"  clean heavy box-drawing seven-segment line digits
     //   "outline" double-line box-drawing silhouette digits
     //   "minimal" light box-drawing seven-segment line digits
-    //   "classic" solid LIGHT shade ░ terminal numerals
-    //   "bold"    solid HEAVY shade ▓ terminal numerals
+    //   "classic" solid cornered/rounded terminal numerals (distinct shape, █)
+    //   "bold"    solid heavy-slab terminal numerals (distinct shape, █)
     const rawLines = renderCounter(plan.style, time, scale);
     counterLines = rawLines.map((line) => {
       const padded = padTo(line, innerW, "center");

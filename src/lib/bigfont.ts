@@ -323,7 +323,7 @@ export function computeSessionScale(
 /**
  * Pick the counter scale for `style`. Every display style now shares the exact
  * 5-row × 4-col `block` footprint (the tall 9-row `classic`/`bold` letterforms
- * were retired in favour of 5-row shade weights — see STYLE_METRICS), so a
+ * were retired in favour of native 5-row letterforms — see STYLE_METRICS), so a
  * single scale gives ALL styles an identical rendered size. Cycling styles with
  * `d` therefore never makes the counter jump in size, and no style-specific
  * "taming" is needed — this is now a thin, style-aware wrapper over
@@ -339,16 +339,17 @@ export function uniformCounterScale(
 }
 
 // ---------------------------------------------------------------------------
-// Solid shade-weight "classic" / "bold" fonts — terminal numerals
+// Native distinct-shape "classic" / "bold" fonts — terminal numerals
 // ---------------------------------------------------------------------------
 
 /**
  * Per-style glyph geometry. EVERY style shares the original 5-row, 4-wide-digit,
  * 1-wide-colon footprint, so the reserve-first scaling maths and small-panel
- * fallback thresholds are byte-for-byte identical across all six styles. The
- * styles differ only in how each filled cell is INKED (see `renderCounter`):
- * `block` full `█`, `classic`/`bold` the light `░` / heavy `▓` shade
- * weights, and `simple`/`outline`/`minimal` box-drawing line-art.
+ * fallback thresholds are byte-for-byte identical across all six styles.
+ * `block`, `classic`, and `bold` are three solid fonts with distinct glyph shapes
+ * (all inked with `█`): block uses blunt filled rectangles, classic uses cornered/
+ * open terminal numerals, and bold uses heavy-slab numerals. `simple`, `outline`,
+ * and `minimal` use box-drawing line-art and differ by stroke weight and style.
  */
 interface StyleMetrics {
   rows: number;
@@ -382,30 +383,77 @@ export function styleWidth(style: DisplayStyle, time: string, scale = 1): number
   return w * scale;
 }
 
-/** The shade glyph each solid weight inks its filled cells with. */
-const CLASSIC_FILL = "░"; // light shade — the airy `classic` weight (clearly distinct from solid block)
-const BOLD_FILL = "▓"; // heavy shade — the `bold` weight
+// 4-wide × 5-tall CORNERED/OPEN terminal numerals (the `classic` style). A
+// stylized, rounded-terminal letterform: notched corners and open interiors give
+// it a softer silhouette clearly distinct from block's blunt rectangles, while
+// keeping block's exact 5-row × 4-col footprint. Uses only █ so it cell-repeat
+// scales as cleanly as the block font.
+const CLASSIC_GLYPHS: Record<string, string[]> = {
+  "0": [" ██ ", "█  █", "█  █", "█  █", " ██ "],
+  "1": [" ██ ", "  █ ", "  █ ", "  █ ", " ███"],
+  "2": [" ██ ", "█  █", "  █ ", " █  ", "████"],
+  "3": ["███ ", "   █", " ██ ", "   █", "███ "],
+  "4": ["█  █", "█  █", " ███", "   █", "  ██"],
+  "5": ["████", "█   ", "███ ", "   █", "███ "],
+  "6": [" ██ ", "█   ", "███ ", "█  █", " ██ "],
+  "7": ["███ ", "  █ ", " █  ", " █  ", "█   "],
+  "8": [" ██ ", "█  █", " ██ ", "█  █", " ██ "],
+  "9": [" ██ ", "█  █", " ███", "   █", " ██ "],
+  ":": [" ", "█", " ", "█", " "],
+};
+
+// 4-wide × 5-tall HEAVY-SLAB terminal numerals (the `bold` style). The same
+// terminal-numeral family as `classic` but with filled corners and extra interior
+// ink, so it reads as a visibly heavier weight than both block and classic — yet
+// keeps block's exact 5-row × 4-col footprint and scales cleanly (█ only).
+const BOLD_GLYPHS: Record<string, string[]> = {
+  "0": ["████", "██ █", "█  █", "█ ██", "████"],
+  "1": [" ██ ", "███ ", " ██ ", " ██ ", "████"],
+  "2": ["████", "  ██", "████", "██  ", "████"],
+  "3": ["████", "  ██", " ███", "  ██", "████"],
+  "4": ["█ ██", "█ ██", "████", "  ██", "  ██"],
+  "5": ["████", "██  ", "████", "  ██", "████"],
+  "6": ["████", "██  ", "████", "█ ██", "████"],
+  "7": ["████", "  ██", " ██ ", " ██ ", " ██ "],
+  "8": ["████", "█ ██", "████", "█ ██", "████"],
+  "9": ["████", "█ ██", "████", "  ██", "████"],
+  ":": [" ", "█", " ", "█", " "],
+};
 
 /**
- * Render the solid `block` geometry with a different fill glyph. `classic` and
- * `bold` are weight variants of the default `block` font: they share its EXACT
- * 5-row × 4-col cell grid (so every dimension, scale step and layout reservation
- * is byte-for-byte identical to block), and differ only by inking each filled
- * cell with a light `░` / heavy `▓` shade instead of the full `█`. Reusing
- * `renderBigLines` guarantees the footprint can never drift from block's.
+ * Render a 5-row solid terminal-numeral font (classic/bold) by integer
+ * cell-repeat — crisp at every scale, no half-block artefacts and no footprint
+ * drift. Each digit is 4 cols, the colon 1 col, the gap 1 col (× scale), exactly
+ * matching block's geometry / `styleWidth`, so the reserve-first scaling maths and
+ * small-window thresholds are byte-for-byte identical across all six styles. These
+ * letterforms have DISTINCT shapes from block (cornered `classic`, heavy `bold`),
+ * so cycling styles with `d` shows a clear change without altering the footprint.
  */
-function renderShaded(time: string, scale: number, fill: string): string[] {
-  return renderBigLines(time, scale).map((line) => line.replaceAll("█", fill));
+function renderSolidGlyphs(time: string, scale: number, glyphs: Record<string, string[]>): string[] {
+  const totalRows = BIG_ROWS * scale;
+  const rows = Array.from({ length: totalRows }, () => "");
+  const chars = [...time];
+  chars.forEach((ch, idx) => {
+    const glyph = glyphs[ch] ?? [" ", " ", " ", " ", " "];
+    const sep = idx < chars.length - 1 ? " ".repeat(scale) : "";
+    for (let r = 0; r < BIG_ROWS; r++) {
+      const scaledRow = [...(glyph[r] ?? "")].map((c) => c.repeat(scale)).join("");
+      for (let s = 0; s < scale; s++) {
+        rows[r * scale + s] = (rows[r * scale + s] ?? "") + scaledRow + sep;
+      }
+    }
+  });
+  return rows;
 }
 
-/** Render the `classic` style — solid LIGHT shade (`░`) terminal numerals. */
+/** Render the `classic` style — solid cornered/open terminal numerals (distinct shape from block). */
 export function renderClassicLines(time: string, scale = 1): string[] {
-  return renderShaded(time, scale, CLASSIC_FILL);
+  return renderSolidGlyphs(time, scale, CLASSIC_GLYPHS);
 }
 
-/** Render the `bold` style — solid HEAVY shade (`▓`) terminal numerals. */
+/** Render the `bold` style — solid heavy-slab terminal numerals (distinct shape from block). */
 export function renderBoldLines(time: string, scale = 1): string[] {
-  return renderShaded(time, scale, BOLD_FILL);
+  return renderSolidGlyphs(time, scale, BOLD_GLYPHS);
 }
 
 /** Render `time` in the requested display style at the given scale. */

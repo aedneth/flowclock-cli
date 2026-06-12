@@ -287,14 +287,14 @@ describe("renderMinimalLines (light seven-segment style)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// renderClassicLines / renderBoldLines — 5-row shade-weight variants of block
+// renderClassicLines / renderBoldLines — native 5-row distinct-shape fonts
 //
-// These are NO LONGER tall 9-row terminal fonts. They share the exact 5-row ×
-// 4-col block footprint and differ only by inking filled cells with ░ (classic)
-// or ▓ (bold) rather than █.
+// These are native 5-row fonts with distinct glyph shapes from block (cornered
+// classic, heavy-slab bold), both inked solid █, sharing block's exact 5-row ×
+// 4-col footprint. No shade chars (░ ▒ ▓) — every filled cell is █.
 // ---------------------------------------------------------------------------
 
-describe("renderClassicLines / renderBoldLines (5-row shade-weight variants of block)", () => {
+describe("renderClassicLines / renderBoldLines (native 5-row distinct-shape fonts)", () => {
   it("classic is 5 rows tall at scale 1 — same as block (styleBaseRows == BIG_ROWS)", () => {
     expect(renderClassicLines("12:34:56", 1)).toHaveLength(BIG_ROWS);
     expect(renderClassicLines("0", 3)).toHaveLength(BIG_ROWS * 3);
@@ -343,51 +343,36 @@ describe("renderClassicLines / renderBoldLines (5-row shade-weight variants of b
     }
   });
 
-  it("classic inks with ░ (not █), bold inks with ▓ (not █)", () => {
+  it("classic and bold ink with solid █ (no shade chars, no box-drawing)", () => {
     const c = renderClassicLines("8", 2).join("");
-    expect(c).toContain("░");
-    expect(c).not.toContain("█");
-    expect(/[─│┌┐└┘┃━]/.test(c)).toBe(false);
+    expect(c).toContain("█");
+    expect(c).not.toContain("░");
+    expect(c).not.toContain("▒");
+    expect(c).not.toContain("▓");
+    expect(/[─│┌┐└┘┃━╔╗╚╝║═]/.test(c)).toBe(false);
 
     const b = renderBoldLines("8", 2).join("");
-    expect(b).toContain("▓");
-    expect(b).not.toContain("█");
+    expect(b).toContain("█");
+    expect(b).not.toContain("░");
+    expect(b).not.toContain("▒");
+    expect(b).not.toContain("▓");
+    expect(/[─│┌┐└┘┃━╔╗╚╝║═]/.test(b)).toBe(false);
   });
 
-  it("classic line[i] == block line[i] with █→░ at scale 1 (exact geometry reuse)", () => {
+  it("classic glyphs differ from block glyphs (distinct shape, not a re-inked block)", () => {
     const t = "12:34:56";
-    const blockLines = renderBigLines(t, 1);
-    const classicLines = renderClassicLines(t, 1);
-    blockLines.forEach((blockLine, i) => {
-      expect(classicLines[i]).toBe(blockLine.replaceAll("█", "░"));
-    });
+    // Both use █, so plain inequality proves distinct shape (not just a re-ink).
+    expect(renderClassicLines(t, 1)).not.toEqual(renderBigLines(t, 1));
+    // Spot-check individual digit shapes differ.
+    expect(renderClassicLines("4", 1)).not.toEqual(renderBigLines("4", 1));
   });
 
-  it("classic line[i] == block line[i] with █→░ at scale 2 (geometry reuse at scale 2)", () => {
+  it("bold glyphs differ from block glyphs (distinct shape, heavier weight)", () => {
     const t = "12:34:56";
-    const blockLines = renderBigLines(t, 2);
-    const classicLines = renderClassicLines(t, 2);
-    blockLines.forEach((blockLine, i) => {
-      expect(classicLines[i]).toBe(blockLine.replaceAll("█", "░"));
-    });
-  });
-
-  it("bold line[i] == block line[i] with █→▓ at scale 1 (exact geometry reuse)", () => {
-    const t = "12:34:56";
-    const blockLines = renderBigLines(t, 1);
-    const boldLines = renderBoldLines(t, 1);
-    blockLines.forEach((blockLine, i) => {
-      expect(boldLines[i]).toBe(blockLine.replaceAll("█", "▓"));
-    });
-  });
-
-  it("bold line[i] == block line[i] with █→▓ at scale 2 (geometry reuse at scale 2)", () => {
-    const t = "12:34:56";
-    const blockLines = renderBigLines(t, 2);
-    const boldLines = renderBoldLines(t, 2);
-    blockLines.forEach((blockLine, i) => {
-      expect(boldLines[i]).toBe(blockLine.replaceAll("█", "▓"));
-    });
+    // Both use █, so plain inequality proves distinct shape.
+    expect(renderBoldLines(t, 1)).not.toEqual(renderBigLines(t, 1));
+    // Bold and classic must also differ from each other.
+    expect(renderBoldLines("1", 1)).not.toEqual(renderClassicLines("1", 1));
   });
 
   it("classic and bold are visually distinct from block and from each other", () => {

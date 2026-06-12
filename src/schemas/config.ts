@@ -12,8 +12,8 @@ export type ThemeName = z.infer<typeof ThemeNameSchema>;
  *  - "simple"  clean heavy box-drawing seven-segment digits
  *  - "outline" hollow DOUBLE-LINE silhouette glyphs (╔═╗ ║ ╚╝ — distinct at every scale)
  *  - "minimal" clean light box-drawing seven-segment digits (airy line font)
- *  - "classic" solid terminal numerals in a LIGHT shade weight (░)
- *  - "bold"    solid terminal numerals in a HEAVY shade weight (▓)
+ *  - "classic" solid cornered/rounded terminal numerals (distinct shape, native 5-row)
+ *  - "bold"    solid heavy-slab terminal numerals (distinct shape, heavier weight)
  */
 export const DisplayStyleSchema = z.enum([
   "simple",
