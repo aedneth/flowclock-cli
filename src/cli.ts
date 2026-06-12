@@ -10,6 +10,7 @@ import { jsonError, printJson, jsonRequested } from "./lib/output.js";
 import { runStart } from "./commands/start.js";
 import { parseDurationToS } from "./lib/format.js";
 import { runLog } from "./commands/log.js";
+import { runEdit } from "./commands/edit.js";
 import { runStats } from "./commands/stats.js";
 import { runHistory } from "./commands/history.js";
 import { runGoals } from "./commands/goals.js";
@@ -177,6 +178,48 @@ export function buildProgram(): Command {
           }
 
           return runLog(ctx, { ...opts, focusTargetS, breakBudgetS });
+        }),
+      ),
+  );
+
+  // edit — surgically edit a logged session's essential values.
+  addGlobalFlags(
+    program
+      .command("edit")
+      .description(
+        "edit a logged session (focus/break/goal/name); end + timeline recompute automatically",
+      )
+      .argument("<id>", "session id (or a unique id prefix)")
+      .option("--focus <dur>", "new active focus time, e.g. 1h30m, 90m, 45s")
+      .option("--break <dur>", "new total break time, e.g. 20m (0 clears breaks)")
+      .option("--goal <text>", "new goal/intention (empty string clears)")
+      .option("--name <text>", "new session name/label (empty string clears)")
+      .action((id: string, opts, cmd: Command) =>
+        guard("edit", cmd, (ctx) => {
+          let focusS: number | undefined;
+          let breakS: number | undefined;
+
+          if (opts.focus !== undefined) {
+            try {
+              focusS = parseDurationToS(opts.focus as string);
+            } catch {
+              fail(ExitCode.USAGE, `invalid --focus: ${opts.focus as string} (use forms like 1h30m, 90m, 45s)`);
+            }
+          }
+          if (opts.break !== undefined) {
+            try {
+              breakS = parseDurationToS(opts.break as string);
+            } catch {
+              fail(ExitCode.USAGE, `invalid --break: ${opts.break as string} (use forms like 20m, 0)`);
+            }
+          }
+
+          return runEdit(ctx, id, {
+            focusS,
+            breakS,
+            goal: opts.goal as string | undefined,
+            name: opts.name as string | undefined,
+          });
         }),
       ),
   );

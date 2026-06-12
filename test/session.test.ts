@@ -11,6 +11,7 @@ import { join } from "node:path";
 import {
   appendSession,
   deleteSession,
+  updateSession,
   readSessions,
   querySessions,
   makeSessionId,
@@ -48,6 +49,30 @@ describe("session store", () => {
     const { sessions } = readSessions(file);
     expect(sessions).toHaveLength(2);
     expect(sessions[1]!.durationS).toBe(120);
+  });
+
+  it("updates a session by id, recomputes end, persists atomically", () => {
+    appendSession(file, sample(60, "2026-05-01T10:00:00.000Z"));
+    const b = appendSession(file, sample(21600, "2026-05-02T10:00:00.000Z")); // 6h runaway
+    const updated = updateSession(file, b.id, { focusS: 5400 }); // → 1h30m
+    expect(updated).not.toBeNull();
+    expect(updated!.durationS).toBe(5400);
+    expect(updated!.end).toBe("2026-05-02T11:30:00.000Z");
+    // start immutable; other session untouched; change persisted to disk
+    const { sessions } = readSessions(file);
+    expect(sessions).toHaveLength(2);
+    const onDisk = sessions.find((s) => s.id === b.id)!;
+    expect(onDisk.durationS).toBe(5400);
+    expect(onDisk.start).toBe(b.start);
+  });
+
+  it("updateSession returns null for an unknown id and leaves the file untouched", () => {
+    const a = appendSession(file, sample(60, "2026-05-01T10:00:00.000Z"));
+    const before = readSessions(file).sessions;
+    const res = updateSession(file, "no-such-id", { focusS: 10 });
+    expect(res).toBeNull();
+    expect(readSessions(file).sessions).toEqual(before);
+    expect(a.id).toBeTruthy();
   });
 
   it("deletes a session by id and persists the rest", () => {

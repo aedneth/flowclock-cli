@@ -6,6 +6,38 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.7.0] - 2026-06-12
+
+### Added
+
+- **Session editing — dashboard `[e]` overlay (view 3 · Sessions).** While a
+  session row or detail is focused, press **`e`** to open an "Edit session"
+  overlay that mirrors the new-session form. Editable fields: **Goal**, **Name**,
+  **Focus**, **Break**. A read-only **Start** line shows the immutable start
+  timestamp; a live-computed **End →** preview reflects the current
+  focus + break values. **`[Tab]`** advances the field, **`[Enter]`** saves and
+  closes, **`[Esc]`** cancels with no changes written.
+- **`flowclock edit <id>` CLI command (headless / agent-friendly).** Edits a
+  logged session's essential values without touching the JSON file by hand.
+  Flags: `--focus <dur>` · `--break <dur>` · `--goal <text>` · `--name <text>` ·
+  `--json`. `<id>` accepts a unique prefix of the session id. `--break 0` clears
+  all recorded breaks. An empty string (`--goal ""` / `--name ""`) clears that
+  field. Outputs the full updated Session record; pair with `--json` for
+  machine-readable output. `flowclock manifest --json` now advertises `edit` for
+  agent discovery.
+- **Recompute semantics (exact, immutable-start contract).** The session start
+  timestamp is immutable. `end = start + focus + break`, exact to the second.
+  Reducing focus (the "fell asleep, timer kept running" case) trims the surplus
+  from the **last** focus segment (tail), cascading backwards only if needed —
+  existing breaks keep their exact duration, category, and order; breaks are NOT
+  auto-scaled when focus changes. The break total is edited independently and
+  optionally: leaving it unchanged keeps recorded breaks byte-for-byte; `0`
+  removes all breaks; a new positive total scales existing breaks proportionally
+  (categories preserved) or, if there were none, appends one `rest` break.
+- **Pure engine + two surfaces.** Recompute logic lives in
+  `src/lib/session-edit.ts` (`recomputeSession`), wrapped by `updateSession` in
+  `src/lib/session.ts`; the dashboard overlay is `src/tui/editform.ts`.
+
 ## [3.6.0] - 2026-06-12
 
 ### Changed

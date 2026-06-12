@@ -2,6 +2,7 @@ import { existsSync, readFileSync, renameSync } from "node:fs";
 import { randomBytes } from "node:crypto";
 import { writeFileAtomic } from "./fsutil.js";
 import { SessionSchema, type Session } from "../schemas/session.js";
+import { recomputeSession, type SessionEditPatch } from "./session-edit.js";
 import { ExitCode, fail } from "./exit.js";
 
 /**
@@ -88,6 +89,29 @@ export function deleteSession(file: string, id: string): Session[] {
   const remaining = sessions.filter((s) => s.id !== id);
   writeFileAtomic(file, JSON.stringify(remaining, null, 2) + "\n");
   return remaining;
+}
+
+/**
+ * Recompute and persist a surgical edit to one session, atomically. Looks the
+ * session up by id, applies `recomputeSession` (auto-recomputes end + break
+ * timeline from the edited focus/break totals), and rewrites the file.
+ *
+ * Returns the updated record, or `null` when no session matches the id (the
+ * file is left untouched in that case).
+ */
+export function updateSession(
+  file: string,
+  id: string,
+  patch: SessionEditPatch,
+): Session | null {
+  const { sessions } = readSessions(file);
+  const idx = sessions.findIndex((s) => s.id === id);
+  if (idx === -1) return null;
+
+  const updated = recomputeSession(sessions[idx]!, patch);
+  sessions[idx] = updated;
+  writeFileAtomic(file, JSON.stringify(sessions, null, 2) + "\n");
+  return updated;
 }
 
 /** Filter/limit options shared by stats and history. */
