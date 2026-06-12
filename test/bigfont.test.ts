@@ -290,7 +290,7 @@ describe("renderMinimalLines (light seven-segment style)", () => {
 // renderClassicLines / renderBoldLines — 5-row shade-weight variants of block
 //
 // These are NO LONGER tall 9-row terminal fonts. They share the exact 5-row ×
-// 4-col block footprint and differ only by inking filled cells with ▒ (classic)
+// 4-col block footprint and differ only by inking filled cells with ░ (classic)
 // or ▓ (bold) rather than █.
 // ---------------------------------------------------------------------------
 
@@ -343,9 +343,9 @@ describe("renderClassicLines / renderBoldLines (5-row shade-weight variants of b
     }
   });
 
-  it("classic inks with ▒ (not █), bold inks with ▓ (not █)", () => {
+  it("classic inks with ░ (not █), bold inks with ▓ (not █)", () => {
     const c = renderClassicLines("8", 2).join("");
-    expect(c).toContain("▒");
+    expect(c).toContain("░");
     expect(c).not.toContain("█");
     expect(/[─│┌┐└┘┃━]/.test(c)).toBe(false);
 
@@ -354,21 +354,21 @@ describe("renderClassicLines / renderBoldLines (5-row shade-weight variants of b
     expect(b).not.toContain("█");
   });
 
-  it("classic line[i] == block line[i] with █→▒ at scale 1 (exact geometry reuse)", () => {
+  it("classic line[i] == block line[i] with █→░ at scale 1 (exact geometry reuse)", () => {
     const t = "12:34:56";
     const blockLines = renderBigLines(t, 1);
     const classicLines = renderClassicLines(t, 1);
     blockLines.forEach((blockLine, i) => {
-      expect(classicLines[i]).toBe(blockLine.replaceAll("█", "▒"));
+      expect(classicLines[i]).toBe(blockLine.replaceAll("█", "░"));
     });
   });
 
-  it("classic line[i] == block line[i] with █→▒ at scale 2 (geometry reuse at scale 2)", () => {
+  it("classic line[i] == block line[i] with █→░ at scale 2 (geometry reuse at scale 2)", () => {
     const t = "12:34:56";
     const blockLines = renderBigLines(t, 2);
     const classicLines = renderClassicLines(t, 2);
     blockLines.forEach((blockLine, i) => {
-      expect(classicLines[i]).toBe(blockLine.replaceAll("█", "▒"));
+      expect(classicLines[i]).toBe(blockLine.replaceAll("█", "░"));
     });
   });
 
