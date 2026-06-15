@@ -42,6 +42,43 @@ export class Timer {
     this.startMs = startMs ?? this.clock();
   }
 
+  /**
+   * Rebuild a *running* timer from a recovered snapshot (crash recovery).
+   *
+   * The reconstructed timer's active focus equals `focusS` and its accumulated
+   * break equals the sum of `breaks` durations, continuing forward from `now`.
+   * The wall-clock gap between the crash and the resume is intentionally
+   * discarded — we never invent focus time, so the session picks up exactly
+   * where the last heartbeat left it. Resumes in focus mode (any break that was
+   * open at crash time is already folded into `breaks` by the journal writer).
+   *
+   * Because the start anchor moves forward by the discarded gap, the recorded
+   * breaks are shifted by the same delta so they keep their original spacing
+   * and stay inside the reconstructed [start, now] window — the final record
+   * is internally consistent (end - start === focus + break).
+   */
+  static fromResume(
+    focusS: number,
+    breaks: Break[],
+    originalStartISO: string,
+    clock: Clock = Date.now,
+  ): Timer {
+    const now = clock();
+    const breakMs = breaks.reduce((sum, b) => sum + b.durationS, 0) * 1000;
+    const startMs = now - Math.max(0, focusS) * 1000 - breakMs;
+    const delta = startMs - Date.parse(originalStartISO);
+    const t = new Timer(clock, startMs);
+    t.totalBreakMs = breakMs;
+    for (const b of breaks) {
+      t.breaks.push({
+        ...b,
+        start: new Date(Date.parse(b.start) + delta).toISOString(),
+        end: new Date(Date.parse(b.end) + delta).toISOString(),
+      });
+    }
+    return t;
+  }
+
   get isPaused(): boolean {
     return this.onBreak;
   }

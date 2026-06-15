@@ -209,9 +209,15 @@ Live session controls inside the dashboard:
 | --- | ------ |
 | `p` | Pause / resume |
 | `b` | Start / end a break |
-| `1`–`6` | Pick break category (rest · meal · exercise · walk · distraction · other) |
+| `1`–`6` | Pick a quick break category (rest · meal · exercise · walk · distraction · other) |
+| `m` | Open the break-category picker — **all** categories, incl. **coffee** and **sleep** |
+| `x` | **Cancel** the session (discard without saving — confirmed first) |
 | `r` | Reset the session clock |
-| `q` | Stop & save the session (a summary shows, then the Session view) |
+| `q` | Stop & **save** the session (a summary shows, then the Session view) |
+
+`q` saves, `x` discards. The full category set is `rest · meal · exercise ·
+walk · distraction · other · coffee · sleep`; keys `1`–`6` stay bound to the
+first six so the footer stays short, and `[m]` reaches the rest.
 
 ### Starting a session — the in-dashboard form
 
@@ -222,7 +228,7 @@ palette) to open a centered form:
 ```
  ╔══════════════════ New session ══════════════════╗
  ║ › Goal          Deep work — StreamNet▏           ║
- ║   Name                                           ║
+ ║   Details                                        ║
  ║   Target        1h                               ║
  ║   Break budget  20m                              ║
  ║                                                  ║
@@ -242,6 +248,44 @@ The shell entry point still works and behaves identically:
 ```bash
 flowclock start --goal "Deep work — StreamNet" --target 1h --break-budget 20m
 ```
+
+Every text field is a real editor: move with **← →**, **Home**/**End**, delete
+around the cursor with **Backspace**/**Del**, and **paste** clipboard text
+(multi-line pastes are flattened to one line). The same applies to the edit
+overlay (`[e]` on the Sessions view).
+
+### Cancelling a session — `[x]` (discard) vs `[q]` (save)
+
+For a throwaway or test session you don't want recorded, press **`x`**. A
+confirm overlay appears (`[y]` / `[n]`); confirming discards the session
+entirely — nothing is written and the recovery journal is cleared. Use **`q`**
+when you want to stop **and save**.
+
+### Crash recovery — resume an interrupted session
+
+Hardware froze? Hard reset? While a session runs, FlowClock journals it to
+`~/.local/share/flowclock/active-session.json` (on start, on each control
+change, and on a ~5-second heartbeat). The next time you open the dashboard, an
+orphaned journal triggers a resume prompt:
+
+```
+ ╔═══════════ Resume previous session? ════════════╗
+ ║ A session was interrupted:                       ║
+ ║   Deep work — StreamNet                          ║
+ ║   details: CKIS Backup Session                   ║
+ ║                                                  ║
+ ║   focus  3h 12m                                  ║
+ ║   break  0s                                      ║
+ ║                                                  ║
+ ║ [r] resume · [d] discard · [Esc] discard         ║
+ ╚══════════════════════════════════════════════════╝
+```
+
+**`[r]`** (or `Enter`) rebuilds the session and keeps going; **`[d]`** / `Esc`
+discards it. Recovery is conservative — it restores to the **last heartbeat**
+and never counts the frozen gap as focus, so at most a few seconds are lost. A
+clean stop (`q`) or cancel (`x`) removes the journal, so you are only ever
+prompted after a real crash.
 
 ### Display style — `block` / `simple` / `outline` / `minimal` / `classic` / `bold` (cycle live)
 
@@ -372,8 +416,8 @@ Every interactive flow has a non-interactive equivalent, so terminal AI agents
 
 ```bash
 flowclock log --duration 3000 --goal "Deep work" \
-              --target 1h --break-budget 20m --json   # record a full session
-flowclock edit <id> --focus 90m --json                # fix a session that ran while you slept
+              --details "CKIS backup" --target 1h --break-budget 20m --json   # record a full session
+flowclock edit <id> --focus 90m --details "renamed" --json   # fix a session that ran while you slept
 flowclock dashboard --json | jq .data.game            # the whole snapshot, no TTY
 flowclock stats --json | jq .data.game.flowScore      # compose with pipes
 echo "$SESSION_JSON" | flowclock log --json           # accept session JSON on stdin
@@ -425,7 +469,7 @@ on read.
 ## Data model
 
 A session records **active focus seconds** (`durationS`) plus categorized
-**breaks** (each with `category` ∈ `rest·meal·exercise·walk·distraction·other`),
+**breaks** (each with `category` ∈ `rest·meal·exercise·walk·distraction·other·coffee·sleep`),
 the total `breakS`, and the optional `focusTargetS` / `breakBudgetS` you set. The
 on-disk schema is **v3**; migrations are non-destructive.
 
@@ -446,7 +490,8 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v3.5.0** ✅ | `classic`/`bold` redesigned as 5-row shade weights (`▒`/`▓`) for exact footprint parity with all styles — no more towering, goal covering, or silent fallback to `block` |
 | **v3.5.1** ✅ | `classic` lightened to `░` shade so block `█` / classic `░` / bold `▓` read as three distinct surfaces while keeping exact 5-row footprint parity |
 | **v3.6.0** ✅ | `classic`/`bold` redesigned as native 5-row fonts with distinct glyph shapes (cornered `classic` / heavy-slab `bold`, both solid) — replaces the v3.5.x shade-fill approach so the three solid styles read as clearly distinct while keeping exact footprint parity |
-| **v3.7.0** ✅ | Session editing — in-dashboard `[e]` overlay (view 3 · Sessions) and `flowclock edit <id>` CLI; editable fields: focus, break total, goal, name; start immutable; end + break timeline recompute automatically |
+| **v3.7.0** ✅ | Session editing — in-dashboard `[e]` overlay (view 3 · Sessions) and `flowclock edit <id>` CLI; editable fields: focus, break total, goal, details; start immutable; end + break timeline recompute automatically |
+| **v3.8.0** ✅ | Crash recovery (resume an interrupted session); `[x]` cancel-without-saving; `coffee` + `sleep` break categories with an `[m]` picker; full line editors (cursor + paste) in every text field; "Name" → "Details" (CLI `--details`, `--name`/`--label` kept as aliases) |
 | **next** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 

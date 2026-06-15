@@ -6,6 +6,46 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.8.0] - 2026-06-15
+
+### Added
+
+- **Crash recovery — resume an interrupted session (`claude --resume` style).**
+  A live dashboard session is now journaled to disk
+  (`~/.local/share/flowclock/active-session.json`) on start, on every control
+  change, and on a ~5s heartbeat. If the process is killed instead of stopped
+  cleanly — a freeze, a hard reset, an OOM — the next launch detects the orphaned
+  journal and opens a **"Resume previous session?"** overlay showing the recovered
+  focus, break, goal and details. **`[r]`** (or `[Enter]`) resumes; **`[d]`** /
+  **`[Esc]`** discards. Recovery is conservative: it restores exactly to the last
+  heartbeat and never invents focus time for the frozen gap. The journal is
+  removed on any clean stop or cancel.
+- **Cancel a session without saving — `[x]`.** While a session runs, **`[x]`**
+  opens a confirm overlay and discards the session entirely (no record written,
+  journal cleared) — for test/throwaway sessions, instead of save-then-delete.
+  `[q]` still stops **and saves**.
+- **Two new break categories — `coffee` and `sleep`.**
+- **Break-category picker overlay — `[m]`.** Number keys **1–6** stay as quick
+  categories; **`[m]`** opens a picker listing **all** categories (incl. coffee
+  and sleep) so the footer stays uncluttered as the set grows. `↑↓`/`j`/`k`
+  select, `1–8` pick directly, `Enter` chooses, `Esc` cancels.
+
+### Changed
+
+- **"Name" → "Details" everywhere.** The session label is now surfaced as
+  **Details** in the new-session form, the edit overlay, the session detail view
+  and help — the field never appeared as "Name" in stored data, and "Details"
+  matches how it is actually used. CLI: `start`, `log` and `edit` now take
+  **`--details <text>`**; the old **`--label`** / **`--name`** flags keep working
+  as hidden deprecated aliases (no workflow breaks). `flowclock manifest --json`
+  advertises `--details`.
+- **Text fields are real line editors.** Every text input in the TUI (goal,
+  details, target, break budget, and the edit overlay) now supports a moving
+  cursor (**← → Home End**), **insert/delete at the cursor** (Backspace/Del), and
+  **paste** — including multi-line clipboard content, which is flattened to a
+  single line. Previously a pasted string kept only its first character.
+- The `[c]` break-category cycle now spans all categories (incl. coffee/sleep).
+
 ## [3.7.0] - 2026-06-12
 
 ### Added

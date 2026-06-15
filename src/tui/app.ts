@@ -11,6 +11,7 @@
 import type { CommandContext } from "../lib/context.js";
 import type { Session } from "../schemas/session.js";
 import type { ThemeName, DisplayStyle } from "../schemas/config.js";
+import { ALL_BREAK_CATEGORIES, QUICK_BREAK_CATEGORIES } from "../schemas/session.js";
 import type { BreakCategory } from "../schemas/session.js";
 import { buildSnapshot } from "../lib/snapshot.js";
 import { readSessions, appendSession, deleteSession, updateSession } from "../lib/session.js";
@@ -59,6 +60,27 @@ import {
   renderEditForm,
 } from "./editform.js";
 import type { EditFormState, EditFormValues } from "./editform.js";
+import {
+  emptyBreakPickerState,
+  openBreakPickerState,
+  breakPickerApplyKey,
+  renderBreakPicker,
+} from "./breakpicker.js";
+import type { BreakPickerState } from "./breakpicker.js";
+import {
+  emptyResumeState,
+  openResumeState,
+  resumeApplyKey,
+  renderResume,
+} from "./resume.js";
+import type { ResumeState } from "./resume.js";
+import {
+  journalPathFor,
+  writeJournal,
+  readJournal,
+  clearJournal,
+} from "../lib/journal.js";
+import type { ActiveSession } from "../lib/journal.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -77,15 +99,9 @@ const VIEW_LABELS: Record<ViewName, string> = {
   help: "6:Help",
 };
 
-/** Ordered break categories — digit keys 1..6 map to this array. */
-const BREAK_CATEGORIES: BreakCategory[] = [
-  "rest",
-  "meal",
-  "exercise",
-  "walk",
-  "distraction",
-  "other",
-];
+/** Ordered break categories — digit keys 1..6 map to this array. The full set
+ * (incl. coffee/sleep) is reachable via the break-category picker ([m]). */
+const BREAK_CATEGORIES: readonly BreakCategory[] = QUICK_BREAK_CATEGORIES;
 
 /** All available themes in cycle order. */
 const THEMES: ThemeName[] = ["neon", "amber", "blue", "mono"];
@@ -94,6 +110,9 @@ const THEMES: ThemeName[] = ["neon", "amber", "blue", "mono"];
 const DISPLAY_STYLES: DisplayStyle[] = ["block", "simple", "outline", "minimal", "classic", "bold"];
 
 const CTRL_C = "\x03";
+
+/** Confirm-modal payload sentinel: discard the live session without saving. */
+const CANCEL_LIVE = "__cancel_live__";
 
 // ---------------------------------------------------------------------------
 // Live session + summary state
@@ -125,6 +144,10 @@ interface AppState {
   form: SessionFormState;
   edit: EditFormState;
   confirm: ConfirmState;
+  /** Break-category picker overlay ([m] during a live session). */
+  breakpicker: BreakPickerState;
+  /** Resume-previous-session overlay (shown at launch after a crash). */
+  resume: ResumeState;
   summary: SummaryState | null;
   theme: ThemeName;
   displayStyle: DisplayStyle;
@@ -346,7 +369,9 @@ export function buildFrame(
   // longer renders its own, so they never duplicate. `z` toggles zen (panel
   // metadata) and Enter toggles this control row's visibility.
   let footerHints: string;
-  if (state.summary) {
+  if (state.resume.open) {
+    footerHints = "[r] resume · [d] discard · [Esc] discard";
+  } else if (state.summary) {
     if (state.summary.askGoal) {
       footerHints = "[y] met · [n] missed · [any key] dismiss";
     } else {
@@ -354,6 +379,8 @@ export function buildFrame(
     }
   } else if (state.confirm.open) {
     footerHints = "[y] confirm · [n] cancel";
+  } else if (state.breakpicker.open) {
+    footerHints = "[↑↓] select · [1-8] pick · [Enter] choose · [Esc] cancel";
   } else if (state.form.open) {
     footerHints = "[Tab] next field · [Enter] start · [Esc] cancel";
   } else if (state.edit.open) {
@@ -367,9 +394,9 @@ export function buildFrame(
     } else {
       const kb = ctx.config.keybindings;
       if (state.live.timer.isOnBreak) {
-        footerHints = `[1]rest [2]meal [3]exercise [4]walk [5]distraction [6]other · [${kb.break}] resume · [Enter] hide`;
+        footerHints = `[1-6] cat · [m] more · [${kb.break}] resume · [Enter] hide`;
       } else {
-        footerHints = `[${kb.pause}] pause · [${kb.break}] break · [1-6] cat · [${kb.reset}] reset · [z] zen · [Enter] hide · [${kb.quit}] stop · [Tab] views`;
+        footerHints = `[${kb.pause}] pause · [${kb.break}] break · [1-6]/[m] cat · [x] cancel · [z] zen · [Enter] hide · [${kb.quit}] stop · [Tab] views`;
       }
     }
   } else if (state.live) {
@@ -387,6 +414,12 @@ export function buildFrame(
   const baseFrame = frame.slice(0, rows);
 
   // ── OVERLAYS ──────────────────────────────────────────────────────────────
+  // Resume overlay (crash recovery) — highest priority, shown at launch.
+  if (state.resume.open) {
+    const resumeOverlay = renderResume(state.resume, cols, rows, theme, color);
+    return compositeOverlay(baseFrame, resumeOverlay, cols);
+  }
+
   // Summary overlay (end-of-session)
   if (state.summary) {
     const summaryOverlay = buildSummaryOverlay(state.summary, cols, rows, theme, color);
@@ -409,6 +442,12 @@ export function buildFrame(
   if (state.edit.open) {
     const editOverlay = renderEditForm(state.edit, cols, rows, theme, color);
     return compositeOverlay(baseFrame, editOverlay, cols);
+  }
+
+  // Break-category picker overlay (during a live session)
+  if (state.breakpicker.open) {
+    const pickerOverlay = renderBreakPicker(state.breakpicker, cols, rows, theme, color);
+    return compositeOverlay(baseFrame, pickerOverlay, cols);
   }
 
   // Palette overlay
@@ -499,12 +538,20 @@ export async function runDashboardApp(
       form: emptySessionFormState(),
       edit: emptyEditFormState(),
       confirm: emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       summary: null,
       theme: ctx.config.theme,
       displayStyle: ctx.config.displayStyle,
       zenLive: false,
       hideControls: false,
     };
+
+    const journalFile = journalPathFor(ctx.config, ctx.paths);
+    /** The recovered journal record, held until the user resumes or discards. */
+    let pendingResumeRec: ActiveSession | null = null;
+    /** Epoch ms of the last journal write (throttle the per-tick heartbeat). */
+    let lastJournalMs = 0;
 
     // If a pending session is provided, start it immediately
     if (opts.pendingSession) {
@@ -519,6 +566,19 @@ export async function runDashboardApp(
       };
       state.view = "session";
       state.theme = ps.theme ?? ctx.config.theme;
+    } else {
+      // No new session requested — offer to resume a prior one left by a crash.
+      const rec = readJournal(journalFile);
+      if (rec) {
+        pendingResumeRec = rec;
+        state.resume = openResumeState({
+          goal: rec.session.goal,
+          label: rec.session.label,
+          focusS: rec.session.durationS,
+          breakS: rec.session.breakS,
+          heartbeatISO: new Date(rec.heartbeat).toISOString(),
+        });
+      }
     }
 
     const screen = new Screen(process.stdout);
@@ -540,7 +600,7 @@ export async function runDashboardApp(
     /** Start the 100ms tick interval. Guard against double-start. */
     function startTick() {
       if (tickInterval !== null) return;
-      tickInterval = setInterval(render, 100);
+      tickInterval = setInterval(tick, 100);
     }
 
     /** Stop the tick interval. */
@@ -549,6 +609,75 @@ export async function runDashboardApp(
         clearInterval(tickInterval);
         tickInterval = null;
       }
+    }
+
+    /**
+     * Snapshot the live session to the crash-recovery journal. The snapshot
+     * reuses Timer.toSession so a recovered session reconstructs through the
+     * exact same path a normal one would. Best-effort: a write failure must
+     * never disrupt the session.
+     */
+    function writeLiveJournal(): void {
+      if (!state.live) return;
+      const t = state.live.timer;
+      const session = t.toSession({
+        source: "hud",
+        goal: state.live.goal ?? undefined,
+        label: state.live.label ?? undefined,
+        focusTargetS: state.live.focusTargetS ?? undefined,
+        breakBudgetS: state.live.breakBudgetS ?? undefined,
+      });
+      try {
+        writeJournal(journalFile, {
+          session,
+          onBreak: t.isOnBreak,
+          breakCategory: t.currentBreakCategory,
+        });
+      } catch {
+        /* best-effort: a missed heartbeat just shortens recovery coverage */
+      }
+      lastJournalMs = Date.now();
+    }
+
+    /** Remove the journal — the session ended cleanly (stop/cancel). */
+    function clearLiveJournal(): void {
+      clearJournal(journalFile);
+      lastJournalMs = 0;
+    }
+
+    /** Per-tick: redraw, and refresh the journal heartbeat at most every 5s. */
+    function tick(): void {
+      render();
+      if (state.live && Date.now() - lastJournalMs >= 5000) writeLiveJournal();
+    }
+
+    /** Reconstruct and start a live session from a recovered journal record. */
+    function resumeFromJournal(rec: ActiveSession): void {
+      const s = rec.session;
+      state.live = {
+        timer: Timer.fromResume(s.durationS, s.breaks, s.start),
+        goal: s.goal,
+        label: s.label,
+        focusTargetS: s.focusTargetS,
+        breakBudgetS: s.breakBudgetS,
+      };
+      state.resume = emptyResumeState();
+      state.view = "session";
+      startTick();
+      writeLiveJournal(); // re-anchor the heartbeat to now
+      render();
+    }
+
+    /** Discard the live session WITHOUT saving (the [x] cancel control). */
+    function cancelSession(): void {
+      if (!state.live) return;
+      stopTick();
+      state.live = null;
+      state.zenLive = false;
+      state.hideControls = false;
+      state.breakpicker = emptyBreakPickerState();
+      clearLiveJournal();
+      render();
     }
 
     function cleanup() {
@@ -589,6 +718,9 @@ export async function runDashboardApp(
       const breakS = record.breakS;
 
       stopTick();
+      // The session is over; from here persistence is handled by the summary
+      // modal (or handleSignal). Drop the journal so it is never re-offered.
+      clearLiveJournal();
       state.live = null;
       // Reset live-only view toggles so the next session starts normally.
       state.zenLive = false;
@@ -631,6 +763,8 @@ export async function runDashboardApp(
       if (state.summary) {
         appendSession(file, state.summary.record);
       }
+      // The session is now persisted; drop the journal so it is not re-offered.
+      clearLiveJournal();
       cleanup();
     }
 
@@ -711,6 +845,7 @@ export async function runDashboardApp(
       state.form = emptySessionFormState();
       state.view = "session";
       startTick();
+      writeLiveJournal(); // seed the crash-recovery journal immediately
       render();
     }
 
@@ -838,6 +973,30 @@ export async function runDashboardApp(
     }
 
     stopReader = startNavReader(process.stdin, (key) => {
+      // ── (0) Resume modal: r resume · d/Esc discard ────────────────────────
+      if (state.resume.open) {
+        // Ctrl-C exits; the journal is left in place to re-offer next launch.
+        if (key.name === "char" && key.char === CTRL_C) {
+          cleanup();
+          return;
+        }
+        const result = resumeApplyKey(state.resume, key);
+        state.resume = result.state;
+        if (result.action?.type === "resume" && pendingResumeRec) {
+          resumeFromJournal(pendingResumeRec);
+          pendingResumeRec = null;
+          return;
+        }
+        if (result.action?.type === "discard") {
+          clearLiveJournal();
+          pendingResumeRec = null;
+          render();
+          return;
+        }
+        render();
+        return;
+      }
+
       // ── (1) Summary modal: any key dismisses ──────────────────────────────
       if (state.summary !== null) {
         if (key.name === "char") {
@@ -875,6 +1034,10 @@ export async function runDashboardApp(
         const result = confirmApplyKey(state.confirm, key);
         state.confirm = result.state;
         if (result.action?.type === "confirm" && result.action.payload) {
+          if (result.action.payload === CANCEL_LIVE) {
+            cancelSession(); // discard the live session without saving
+            return;
+          }
           state.sessions = deleteSession(file, result.action.payload);
           clampSelection();
           render();
@@ -927,6 +1090,27 @@ export async function runDashboardApp(
         return;
       }
 
+      // ── (1d) Break-category picker ([m]): pick from ALL categories ─────────
+      if (state.breakpicker.open) {
+        // Ctrl-C closes the picker without exiting the app.
+        if (key.name === "char" && key.char === CTRL_C) {
+          state.breakpicker = emptyBreakPickerState();
+          render();
+          return;
+        }
+        const result = breakPickerApplyKey(state.breakpicker, key);
+        state.breakpicker = result.state;
+        if (result.action?.type === "pick" && state.live) {
+          const cat = result.action.category;
+          const t = state.live.timer;
+          if (t.isOnBreak) t.setBreakCategory(cat);
+          else t.startBreak(cat, null, suggestBreakS(t.elapsedS()));
+          writeLiveJournal();
+        }
+        render();
+        return;
+      }
+
       // ── (2) Palette: feed keys to reducer ────────────────────────────────
       if (state.palette.open) {
         const result = paletteApplyKey(state.palette, key);
@@ -967,6 +1151,7 @@ export async function runDashboardApp(
 
           if (ch === kb.pause) {
             live.timer.togglePause();
+            writeLiveJournal();
             render();
             return;
           }
@@ -977,6 +1162,7 @@ export async function runDashboardApp(
             } else {
               live.timer.startBreak("rest", null, suggestBreakS(live.timer.elapsedS()));
             }
+            writeLiveJournal();
             render();
             return;
           }
@@ -990,13 +1176,35 @@ export async function runDashboardApp(
               } else {
                 live.timer.startBreak(cat, null, suggestBreakS(live.timer.elapsedS()));
               }
+              writeLiveJournal();
             }
+            render();
+            return;
+          }
+
+          // [m] — open the picker for ALL categories (incl. coffee/sleep).
+          if (ch === "m") {
+            state.breakpicker = openBreakPickerState(
+              live.timer.isOnBreak ? live.timer.currentBreakCategory : undefined,
+            );
+            render();
+            return;
+          }
+
+          // [x] — cancel (discard without saving), confirmed first.
+          if (ch === "x") {
+            state.confirm = openConfirmState({
+              title: "Cancel session",
+              message: "Discard this session without saving?",
+              payload: CANCEL_LIVE,
+            });
             render();
             return;
           }
 
           if (ch === kb.reset) {
             live.timer.reset();
+            writeLiveJournal();
             render();
             return;
           }
@@ -1010,9 +1218,11 @@ export async function runDashboardApp(
           if (ch === (ctx.config.keybindings.category ?? "c")) {
             if (live.timer.isOnBreak) {
               const current = live.timer.currentBreakCategory;
-              const idx = BREAK_CATEGORIES.indexOf(current);
-              const next = BREAK_CATEGORIES[(idx + 1) % BREAK_CATEGORIES.length] ?? "rest";
+              const idx = ALL_BREAK_CATEGORIES.indexOf(current);
+              const next =
+                ALL_BREAK_CATEGORIES[(idx + 1) % ALL_BREAK_CATEGORIES.length] ?? "rest";
               live.timer.setBreakCategory(next);
+              writeLiveJournal();
             }
             render();
             return;
@@ -1190,7 +1400,7 @@ export async function runDashboardApp(
         render();
         return;
       }
-    });
+    }, process.stdout); // 3rd arg enables bracketed-paste mode for the forms
 
     process.on("SIGINT", handleSignal);
     process.on("SIGTERM", handleSignal);
@@ -1199,6 +1409,7 @@ export async function runDashboardApp(
     // Start tick interval if we launched with a pending session
     if (state.live) {
       startTick();
+      writeLiveJournal(); // seed the crash-recovery journal immediately
     }
 
     // Initial render

@@ -119,7 +119,7 @@ export function sessionDetail(
     body.push(padTo(`Goal:  ${session.goal}`, innerW));
   }
   if (session.label) {
-    body.push(padTo(`Label: ${session.label}`, innerW));
+    body.push(padTo(`Details: ${session.label}`, innerW));
   }
   body.push(padTo("─".repeat(Math.min(innerW, 20)), innerW));
   body.push(padTo("Timeline:", innerW));

@@ -11,6 +11,7 @@ import type { Key } from "../lib/tui/input.js";
 import type { ThemeName } from "../schemas/config.js";
 import { panel, truncate, padTo } from "../lib/tui/draw.js";
 import { paint, THEME_FG } from "../lib/theme.js";
+import { lineApplyKey, withCursor } from "../lib/tui/lineedit.js";
 
 // ---------------------------------------------------------------------------
 // Fields
@@ -29,7 +30,7 @@ interface FieldSpec {
 /** Ordered fields, top to bottom. */
 export const SESSION_FORM_FIELDS: FieldSpec[] = [
   { key: "goal", label: "Goal", hint: "what you want to accomplish (optional)" },
-  { key: "label", label: "Name", hint: "short session name (optional)" },
+  { key: "label", label: "Details", hint: "extra details for this session (optional)" },
   { key: "target", label: "Target", hint: "focus target — e.g. 1h, 90m, 25m (optional)" },
   { key: "break", label: "Break budget", hint: "e.g. 20m, 5m (optional)" },
 ];
@@ -44,6 +45,8 @@ export interface SessionFormState {
   open: boolean;
   values: SessionFormValues;
   active: number; // index into SESSION_FORM_FIELDS
+  /** Cursor position (code units) within the active field's value. */
+  cursor: number;
   error: string | null;
 }
 
@@ -53,6 +56,7 @@ export function emptySessionFormState(): SessionFormState {
     open: false,
     values: { goal: "", label: "", target: "", break: "" },
     active: 0,
+    cursor: 0,
     error: null,
   };
 }
@@ -73,15 +77,22 @@ export interface SessionFormResult {
     | { type: "cancel" };
 }
 
+/** Move focus to another field and park the cursor at the end of its value. */
+function focusField(state: SessionFormState, nextActive: number): SessionFormState {
+  const key = SESSION_FORM_FIELDS[nextActive]?.key ?? "goal";
+  return { ...state, active: nextActive, cursor: state.values[key].length, error: null };
+}
+
 /**
  * Pure reducer — never mutates `state`.
  *
- *   escape           → cancel (close)
- *   enter            → submit the current values
- *   tab / down       → focus next field (wraps)
- *   up               → focus previous field (wraps)
- *   backspace        → delete last char of the active field
- *   printable char   → append to the active field
+ *   escape              → cancel (close)
+ *   enter               → submit the current values
+ *   tab / down          → focus next field (wraps)
+ *   up                  → focus previous field (wraps)
+ *   ← → Home End        → move the cursor within the active field
+ *   backspace / delete  → delete around the cursor
+ *   printable / paste    → insert at the cursor (full paste supported)
  */
 export function sessionFormApplyKey(
   state: SessionFormState,
@@ -99,41 +110,27 @@ export function sessionFormApplyKey(
 
     case "tab":
     case "down":
-      return { state: { ...state, active: (state.active + 1) % n, error: null } };
+      return { state: focusField(state, (state.active + 1) % n) };
 
     case "up":
-      return { state: { ...state, active: (state.active - 1 + n) % n, error: null } };
+      return { state: focusField(state, (state.active - 1 + n) % n) };
 
-    case "backspace":
+    default: {
+      // Everything else is line editing on the active field.
+      const { state: line, handled } = lineApplyKey(
+        { text: state.values[activeKey], cursor: state.cursor },
+        key,
+      );
+      if (!handled) return { state };
       return {
         state: {
           ...state,
-          values: {
-            ...state.values,
-            [activeKey]: state.values[activeKey].slice(0, -1),
-          },
+          values: { ...state.values, [activeKey]: line.text },
+          cursor: line.cursor,
           error: null,
         },
       };
-
-    case "char": {
-      const ch = key.char;
-      const code = ch.codePointAt(0) ?? 0;
-      // Printable and not Ctrl-C
-      if (code >= 0x20 && ch !== "\x03") {
-        return {
-          state: {
-            ...state,
-            values: { ...state.values, [activeKey]: state.values[activeKey] + ch },
-            error: null,
-          },
-        };
-      }
-      return { state };
     }
-
-    default:
-      return { state };
   }
 }
 
@@ -176,8 +173,8 @@ export function renderSessionForm(
   SESSION_FORM_FIELDS.forEach((field, i) => {
     const isActive = i === clampedActive;
     const value = state.values[field.key];
-    const cursor = isActive ? "▏" : "";
-    const raw = `${field.label.padEnd(LABEL_WIDTH)} ${value}${cursor}`;
+    const shown = isActive ? withCursor(value, state.cursor) : value;
+    const raw = `${field.label.padEnd(LABEL_WIDTH)} ${shown}`;
 
     let line: string;
     if (isActive) {

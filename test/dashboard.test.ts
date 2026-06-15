@@ -30,6 +30,8 @@ import { emptyPaletteState } from "../src/tui/palette.js";
 import { emptySessionFormState } from "../src/tui/sessionform.js";
 import { emptyEditFormState, openEditFormState } from "../src/tui/editform.js";
 import { emptyConfirmState, openConfirmState } from "../src/tui/confirm.js";
+import { emptyBreakPickerState, openBreakPickerState } from "../src/tui/breakpicker.js";
+import { emptyResumeState, openResumeState } from "../src/tui/resume.js";
 import type { ConfirmState } from "../src/tui/confirm.js";
 
 // Command under test
@@ -649,6 +651,8 @@ describe("buildFrame (WS5)", () => {
       edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       zenLive: false,
       hideControls: false,
     };
@@ -684,6 +688,8 @@ describe("buildFrame (WS5)", () => {
       edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       zenLive: false,
       hideControls: false,
     };
@@ -719,6 +725,8 @@ describe("buildFrame (WS5)", () => {
       edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       zenLive: false,
       hideControls: false,
     };
@@ -753,6 +761,8 @@ describe("buildFrame (WS5)", () => {
       edit: opts.edit ?? emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: opts.confirm ?? emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       zenLive: opts.zenLive ?? false,
       hideControls: opts.hideControls ?? false,
     };
@@ -767,6 +777,39 @@ describe("buildFrame (WS5)", () => {
   it("hideControls blanks the footer controls (no 'pause')", () => {
     const out = buildFrame(fcState({ hideControls: true }), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
     expect(out).not.toContain("pause");
+  });
+
+  // ── v3.8.0: live footer advertises the picker + cancel controls ────────────
+  it("live footer shows [m] (picker) and [x] cancel", () => {
+    const out = buildFrame(fcState(), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).toContain("[m]");
+    expect(out).toContain("cancel");
+  });
+
+  // ── v3.8.0: break-category picker overlay composites over the frame ────────
+  it("break-category picker overlay shows all categories incl. coffee + sleep", () => {
+    const state = { ...fcState(), breakpicker: openBreakPickerState() };
+    const out = buildFrame(state, 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).toContain("Break category");
+    expect(out).toContain("coffee");
+    expect(out).toContain("sleep");
+  });
+
+  // ── v3.8.0: resume overlay composites at launch (crash recovery) ──────────
+  it("resume overlay shows the recovered session summary", () => {
+    const state = {
+      ...fcState({ live: null }),
+      resume: openResumeState({
+        goal: "Deep work",
+        label: "CKIS Backup",
+        focusS: 5400,
+        breakS: 900,
+        heartbeatISO: "2026-06-15T15:00:00.000Z",
+      }),
+    };
+    const out = buildFrame(state, 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).toContain("Resume previous session?");
+    expect(out).toContain("Deep work");
   });
 
   it("zen (zenLive) hides the goal from the body", () => {
@@ -838,6 +881,8 @@ describe("buildFrame (WS5)", () => {
       edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       zenLive: false,
       hideControls: false,
     };
@@ -862,6 +907,8 @@ describe("buildFrame (WS5)", () => {
       edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       zenLive: false,
       hideControls: false,
     };
@@ -886,6 +933,8 @@ describe("buildFrame (WS5)", () => {
       edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       zenLive: false,
       hideControls: false,
     };
@@ -910,6 +959,8 @@ describe("buildFrame (WS5)", () => {
       edit: emptyEditFormState(),
       displayStyle: "block" as const,
       confirm: emptyConfirmState(),
+      breakpicker: emptyBreakPickerState(),
+      resume: emptyResumeState(),
       zenLive: false,
       hideControls: false,
     };
