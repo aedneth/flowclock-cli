@@ -99,9 +99,9 @@ export function buildManifest(): Manifest {
             description: "Auto-stop after N active seconds.",
           },
           {
-            name: "--label",
+            name: "--details",
             type: "string",
-            description: "Attach a label to the session.",
+            description: "Extra details for this session (was --label).",
           },
           {
             name: "--goal",
@@ -170,7 +170,7 @@ export function buildManifest(): Manifest {
             description: "ISO-8601 start time.",
           },
           { name: "--end", type: "string", description: "ISO-8601 end time." },
-          { name: "--label", type: "string", description: "Session label." },
+          { name: "--details", type: "string", description: "Session details (was --label)." },
           { name: "--note", type: "string", description: "Session note." },
           {
             name: "--tags",
@@ -199,7 +199,7 @@ export function buildManifest(): Manifest {
           },
         ],
         jsonData: "The stored Session record (v3 schema).",
-        examples: ["flowclock log --duration 600 --label deep-work --json"],
+        examples: ["flowclock log --duration 600 --details deep-work --json"],
       },
       {
         name: "edit",
@@ -223,9 +223,9 @@ export function buildManifest(): Manifest {
             description: "New goal/intention (empty string clears it).",
           },
           {
-            name: "--name",
+            name: "--details",
             type: "string",
-            description: "New session name/label (empty string clears it).",
+            description: "New session details (empty string clears it; was --name).",
           },
         ],
         jsonData: "The updated Session record (v3 schema) with recomputed end + breaks[].",

@@ -188,10 +188,17 @@ describe("editFormApplyKey", () => {
     }
   });
 
-  it("unknown keys leave state unchanged", () => {
+  it("no-op keys (Ctrl-C) leave state unchanged", () => {
+    // home/left/right now move the cursor; a control char is a true no-op.
+    const s = openSample();
+    const next = editFormApplyKey(s, { name: "char", char: "\x03" }).state;
+    expect(next).toEqual(s);
+  });
+
+  it("Home moves the cursor to the start of the active field", () => {
     const s = openSample();
     const next = editFormApplyKey(s, { name: "home" }).state;
-    expect(next).toEqual(s);
+    expect(next.cursor).toBe(0);
   });
 });
 
@@ -255,10 +262,10 @@ describe("renderEditForm", () => {
     expect(startLine).toContain("—");
   });
 
-  it("shows field labels Goal, Name, Focus, Break", () => {
+  it("shows field labels Goal, Details, Focus, Break", () => {
     const joined = renderEditForm(openSample(), 80, 24, "neon", false).rows.join("\n");
     expect(joined).toContain("Goal");
-    expect(joined).toContain("Name");
+    expect(joined).toContain("Details");
     expect(joined).toContain("Focus");
     expect(joined).toContain("Break");
   });

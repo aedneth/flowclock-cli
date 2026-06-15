@@ -1,4 +1,4 @@
-import { Command, InvalidArgumentError } from "commander";
+import { Command, InvalidArgumentError, Option } from "commander";
 import { VERSION } from "./version.js";
 import {
   buildContext,
@@ -93,7 +93,8 @@ export function buildProgram(): Command {
         "auto-stop after N active seconds",
         toInt,
       )
-      .option("--label <text>", "attach a label to the session")
+      .option("--details <text>", "extra details for this session")
+      .addOption(new Option("--label <text>", "deprecated alias for --details").hideHelp())
       .option("--goal <text>", "name the goal/intention for this session")
       .option("--theme <name>", "theme override: neon|amber|blue|mono")
       .option("--big", "render the time in big ASCII (7-segment)")
@@ -125,7 +126,7 @@ export function buildProgram(): Command {
 
           return runStart(ctx, {
             duration: opts.duration,
-            label: opts.label,
+            label: (opts.details ?? opts.label) as string | undefined,
             goal: opts.goal,
             theme: opts.theme,
             big: opts.big,
@@ -149,7 +150,8 @@ export function buildProgram(): Command {
       .option("-d, --duration <seconds>", "active seconds", toInt)
       .option("--start <iso>", "ISO-8601 start time")
       .option("--end <iso>", "ISO-8601 end time")
-      .option("--label <text>", "session label")
+      .option("--details <text>", "session details")
+      .addOption(new Option("--label <text>", "deprecated alias for --details").hideHelp())
       .option("--note <text>", "session note")
       .option("--tags <csv>", "comma-separated tags")
       .option("--goal <text>", "goal/intention for this session")
@@ -177,7 +179,12 @@ export function buildProgram(): Command {
             }
           }
 
-          return runLog(ctx, { ...opts, focusTargetS, breakBudgetS });
+          return runLog(ctx, {
+            ...opts,
+            label: (opts.details ?? opts.label) as string | undefined,
+            focusTargetS,
+            breakBudgetS,
+          });
         }),
       ),
   );
@@ -187,13 +194,14 @@ export function buildProgram(): Command {
     program
       .command("edit")
       .description(
-        "edit a logged session (focus/break/goal/name); end + timeline recompute automatically",
+        "edit a logged session (focus/break/goal/details); end + timeline recompute automatically",
       )
       .argument("<id>", "session id (or a unique id prefix)")
       .option("--focus <dur>", "new active focus time, e.g. 1h30m, 90m, 45s")
       .option("--break <dur>", "new total break time, e.g. 20m (0 clears breaks)")
       .option("--goal <text>", "new goal/intention (empty string clears)")
-      .option("--name <text>", "new session name/label (empty string clears)")
+      .option("--details <text>", "new session details (empty string clears)")
+      .addOption(new Option("--name <text>", "deprecated alias for --details").hideHelp())
       .action((id: string, opts, cmd: Command) =>
         guard("edit", cmd, (ctx) => {
           let focusS: number | undefined;
@@ -218,7 +226,7 @@ export function buildProgram(): Command {
             focusS,
             breakS,
             goal: opts.goal as string | undefined,
-            name: opts.name as string | undefined,
+            name: (opts.details ?? opts.name) as string | undefined,
           });
         }),
       ),

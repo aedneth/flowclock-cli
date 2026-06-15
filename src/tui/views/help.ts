@@ -32,7 +32,8 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
 
   // Starting a session
   body.push(padTo("Start a session (on the Session view, idle):", innerW));
-  body.push(padTo("s / n / Enter open the new-session form (goal · name · target · break budget)", innerW));
+  body.push(padTo("s / n / Enter open the new-session form (goal · details · target · break budget)", innerW));
+  body.push(padTo("Text fields are full editors: ← → Home End move · paste works · Del/Backspace edit.", innerW));
   body.push(padTo("…or from your shell: start --goal \"…\" --target 1h --break-budget 20m", innerW));
 
   // Spacer
@@ -40,8 +41,9 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
 
   // Session controls
   body.push(padTo("Session controls (while a session runs):", innerW));
-  body.push(padTo("p pause · b break · 1-6 category · z zen · Enter hide controls · r reset · q stop & save", innerW));
-  body.push(padTo("categories: 1 rest · 2 meal · 3 exercise · 4 walk · 5 distraction · 6 other", innerW));
+  body.push(padTo("p pause · b break · 1-6 quick category · m more categories · x cancel · z zen · Enter hide · r reset · q stop & save", innerW));
+  body.push(padTo("quick: 1 rest · 2 meal · 3 exercise · 4 walk · 5 distraction · 6 other   ·   m picker adds: coffee · sleep", innerW));
+  body.push(padTo("x cancels without saving (test sessions); q stops & saves.", innerW));
 
   // Spacer
   body.push("");
@@ -49,7 +51,7 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
   // Global
   body.push(padTo("Global:", innerW));
   body.push(padTo("/ command palette · d display style (block/simple/outline/minimal/classic/bold) · t theme · r refresh · q/Esc quit", innerW));
-  body.push(padTo("Sessions list: Enter detail · e edit (focus/break/goal/name; end + timeline recompute) · Supr delete.", innerW));
+  body.push(padTo("Sessions list: Enter detail · e edit (focus/break/goal/details; end + timeline recompute) · Supr delete.", innerW));
   body.push(padTo("d/t saved as default; both also in the / palette.", innerW));
 
   // Spacer

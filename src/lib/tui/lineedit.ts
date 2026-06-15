@@ -94,6 +94,16 @@ export function end(state: LineState): LineState {
 }
 
 /**
+ * Render `text` with a visible cursor bar inserted before the character at
+ * `cursor` (or at the end). The bar sits between cells so it reads like a
+ * caret without overwriting a character.
+ */
+export function withCursor(text: string, cursor: number, glyph = "▏"): string {
+  const at = clamp(cursor, text.length);
+  return text.slice(0, at) + glyph + text.slice(at);
+}
+
+/**
  * Apply a Key to the line. Returns `{ state, handled }`: `handled` is false for
  * keys this editor doesn't own (tab/enter/escape/up/down) so the caller's form
  * reducer can act on them. Ctrl-C is never consumed.

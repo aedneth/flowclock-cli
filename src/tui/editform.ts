@@ -12,6 +12,7 @@ import type { ThemeName } from "../schemas/config.js";
 import { panel, truncate, padTo } from "../lib/tui/draw.js";
 import { paint, THEME_FG } from "../lib/theme.js";
 import { parseDurationToS } from "../lib/format.js";
+import { lineApplyKey, withCursor } from "../lib/tui/lineedit.js";
 
 // ---------------------------------------------------------------------------
 // Fields
@@ -29,8 +30,8 @@ interface FieldSpec {
 
 /** Ordered fields, top to bottom. */
 export const EDIT_FORM_FIELDS: FieldSpec[] = [
-  { key: "goal",  label: "Goal",  hint: "goal/intention (optional, blank clears)" },
-  { key: "label", label: "Name",  hint: "session name (optional, blank clears)" },
+  { key: "goal",  label: "Goal",    hint: "goal/intention (optional, blank clears)" },
+  { key: "label", label: "Details", hint: "session details (optional, blank clears)" },
   { key: "focus", label: "Focus", hint: "active focus time — e.g. 1h30m, 90m, 45s" },
   { key: "break", label: "Break", hint: "total break time — e.g. 20m, 0 to clear breaks" },
 ];
@@ -49,6 +50,8 @@ export interface EditFormState {
   startISO: string | null;
   values: EditFormValues;
   active: number; // index into EDIT_FORM_FIELDS
+  /** Cursor position (code units) within the active field's value. */
+  cursor: number;
   error: string | null;
 }
 
@@ -60,6 +63,7 @@ export function emptyEditFormState(): EditFormState {
     startISO: null,
     values: { goal: "", label: "", focus: "", break: "" },
     active: 0,
+    cursor: 0,
     error: null,
   };
 }
@@ -70,7 +74,13 @@ export function openEditFormState(opts: {
   startISO: string;
   values: EditFormValues;
 }): EditFormState {
-  return { ...emptyEditFormState(), open: true, ...opts };
+  // Park the cursor at the end of the first field's value.
+  return {
+    ...emptyEditFormState(),
+    open: true,
+    ...opts,
+    cursor: opts.values.goal.length,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -84,15 +94,22 @@ export interface EditFormResult {
     | { type: "cancel" };
 }
 
+/** Move focus to another field and park the cursor at the end of its value. */
+function focusField(state: EditFormState, nextActive: number): EditFormState {
+  const key = EDIT_FORM_FIELDS[nextActive]?.key ?? "goal";
+  return { ...state, active: nextActive, cursor: state.values[key].length, error: null };
+}
+
 /**
  * Pure reducer — never mutates `state`.
  *
- *   escape           → cancel (close, return emptyEditFormState)
- *   enter            → submit the current values (with sessionId)
- *   tab / down       → focus next field (wraps)
- *   up               → focus previous field (wraps)
- *   backspace        → delete last char of the active field
- *   printable char   → append to the active field
+ *   escape              → cancel (close, return emptyEditFormState)
+ *   enter               → submit the current values (with sessionId)
+ *   tab / down          → focus next field (wraps)
+ *   up                  → focus previous field (wraps)
+ *   ← → Home End        → move the cursor within the active field
+ *   backspace / delete  → delete around the cursor
+ *   printable / paste    → insert at the cursor (full paste supported)
  */
 export function editFormApplyKey(
   state: EditFormState,
@@ -117,41 +134,26 @@ export function editFormApplyKey(
 
     case "tab":
     case "down":
-      return { state: { ...state, active: (state.active + 1) % n, error: null } };
+      return { state: focusField(state, (state.active + 1) % n) };
 
     case "up":
-      return { state: { ...state, active: (state.active - 1 + n) % n, error: null } };
+      return { state: focusField(state, (state.active - 1 + n) % n) };
 
-    case "backspace":
+    default: {
+      const { state: line, handled } = lineApplyKey(
+        { text: state.values[activeKey], cursor: state.cursor },
+        key,
+      );
+      if (!handled) return { state };
       return {
         state: {
           ...state,
-          values: {
-            ...state.values,
-            [activeKey]: state.values[activeKey].slice(0, -1),
-          },
+          values: { ...state.values, [activeKey]: line.text },
+          cursor: line.cursor,
           error: null,
         },
       };
-
-    case "char": {
-      const ch = key.char;
-      const code = ch.codePointAt(0) ?? 0;
-      // Printable and not Ctrl-C
-      if (code >= 0x20 && ch !== "\x03") {
-        return {
-          state: {
-            ...state,
-            values: { ...state.values, [activeKey]: state.values[activeKey] + ch },
-            error: null,
-          },
-        };
-      }
-      return { state };
     }
-
-    default:
-      return { state };
   }
 }
 
@@ -224,8 +226,8 @@ export function renderEditForm(
   EDIT_FORM_FIELDS.forEach((field, i) => {
     const isActive = i === clampedActive;
     const value = state.values[field.key];
-    const cursor = isActive ? "▏" : "";
-    const raw = `${field.label.padEnd(LABEL_WIDTH)} ${value}${cursor}`;
+    const shown = isActive ? withCursor(value, state.cursor) : value;
+    const raw = `${field.label.padEnd(LABEL_WIDTH)} ${shown}`;
 
     let line: string;
     if (isActive) {
