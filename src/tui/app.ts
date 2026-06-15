@@ -655,7 +655,7 @@ export async function runDashboardApp(
     function resumeFromJournal(rec: ActiveSession): void {
       const s = rec.session;
       state.live = {
-        timer: Timer.fromResume(s.durationS, s.breaks),
+        timer: Timer.fromResume(s.durationS, s.breaks, s.start),
         goal: s.goal,
         label: s.label,
         focusTargetS: s.focusTargetS,
@@ -1400,7 +1400,7 @@ export async function runDashboardApp(
         render();
         return;
       }
-    });
+    }, process.stdout); // 3rd arg enables bracketed-paste mode for the forms
 
     process.on("SIGINT", handleSignal);
     process.on("SIGTERM", handleSignal);

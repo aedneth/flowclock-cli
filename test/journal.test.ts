@@ -78,7 +78,7 @@ describe("Timer.fromResume — conservative gap discard", () => {
     const breaks = new Timer(() => 0, 0).toSession({ source: "hud" }).breaks;
     let now = Date.parse("2026-06-15T12:00:00.000Z");
     const clock = () => now;
-    const resumed = Timer.fromResume(5400, breaks, clock);
+    const resumed = Timer.fromResume(5400, breaks, "2026-06-15T09:00:00.000Z", clock);
     expect(resumed.elapsedS()).toBe(5400); // exactly the heartbeat focus, gap discarded
     now += 60 * 1000; // 1 minute later
     expect(resumed.elapsedS()).toBe(5460); // counts forward normally
@@ -96,7 +96,7 @@ describe("Timer.fromResume — conservative gap discard", () => {
     expect(snap.breakS).toBe(600);
 
     let now = Date.parse("2026-06-15T15:00:00.000Z");
-    const resumed = Timer.fromResume(snap.durationS, snap.breaks, () => now);
+    const resumed = Timer.fromResume(snap.durationS, snap.breaks, snap.start, () => now);
     expect(resumed.totalBreakS()).toBe(600);
     expect(resumed.elapsedS()).toBe(snap.durationS);
     // stopping later yields a consistent end - start = focus + break
@@ -104,5 +104,10 @@ describe("Timer.fromResume — conservative gap discard", () => {
     const out = resumed.toSession({ source: "hud" });
     const span = (Date.parse(out.end) - Date.parse(out.start)) / 1000;
     expect(span).toBe(out.durationS + out.breakS);
+    // every recovered break falls within the reconstructed [start, end] window
+    for (const b of out.breaks) {
+      expect(Date.parse(b.start)).toBeGreaterThanOrEqual(Date.parse(out.start));
+      expect(Date.parse(b.end)).toBeLessThanOrEqual(Date.parse(out.end));
+    }
   });
 });
