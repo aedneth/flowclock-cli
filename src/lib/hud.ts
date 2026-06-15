@@ -347,6 +347,8 @@ const BREAK_CATEGORY_LABELS: Record<BreakCategory, string> = {
   walk: "walk",
   distraction: "distraction",
   other: "other",
+  coffee: "coffee",
+  sleep: "sleep",
 };
 
 /**

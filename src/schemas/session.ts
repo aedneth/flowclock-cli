@@ -37,8 +37,22 @@ export const BreakCategorySchema = z.enum([
   "walk",
   "distraction",
   "other",
+  "coffee",
+  "sleep",
 ]);
 export type BreakCategory = z.infer<typeof BreakCategorySchema>;
+
+/** Every break category, in canonical order (single source of truth). */
+export const ALL_BREAK_CATEGORIES: readonly BreakCategory[] =
+  BreakCategorySchema.options;
+
+/**
+ * The six categories bound to number keys 1–6 in the live session footer. The
+ * rest (coffee, sleep, …) are reachable through the break-category picker so the
+ * footer stays uncluttered as the list grows.
+ */
+export const QUICK_BREAK_CATEGORIES: readonly BreakCategory[] =
+  BreakCategorySchema.options.slice(0, 6);
 
 /** A single break interval within a session. */
 export const BreakSchema = z.object({

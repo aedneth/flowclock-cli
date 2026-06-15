@@ -10,16 +10,12 @@ import type { ThemeName } from "../../schemas/config.js";
 import { panel, kv, barH, padTo } from "../../lib/tui/draw.js";
 import { THEME_FG } from "../../lib/theme.js";
 import { humanDuration } from "../../lib/format.js";
-import type { BreakCategory } from "../../schemas/session.js";
+import {
+  ALL_BREAK_CATEGORIES,
+  type BreakCategory,
+} from "../../schemas/session.js";
 
-const ALL_CATEGORIES: BreakCategory[] = [
-  "rest",
-  "meal",
-  "exercise",
-  "walk",
-  "distraction",
-  "other",
-];
+const ALL_CATEGORIES: readonly BreakCategory[] = ALL_BREAK_CATEGORIES;
 
 export function renderBreaks(
   snap: DashboardSnapshot,

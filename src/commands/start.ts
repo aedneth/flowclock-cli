@@ -9,7 +9,12 @@ import { jsonSuccess, printJson } from "../lib/output.js";
 import { ExitCode, fail } from "../lib/exit.js";
 import { humanDuration } from "../lib/format.js";
 import { suggestBreakS } from "../lib/flowtime.js";
-import type { Session, SessionSource, BreakCategory } from "../schemas/session.js";
+import {
+  QUICK_BREAK_CATEGORIES,
+  type Session,
+  type SessionSource,
+  type BreakCategory,
+} from "../schemas/session.js";
 import { ThemeNameSchema, type ThemeName } from "../schemas/config.js";
 import { runDashboardApp } from "../tui/app.js";
 
@@ -64,14 +69,7 @@ export function shouldUseDashboard(
 const TICK_MS = 100; // matches flowtime.sh `sleep 0.1`
 
 /** Ordered break categories — digit keys 1..6 map to this array. */
-const BREAK_CATEGORIES: BreakCategory[] = [
-  "rest",
-  "meal",
-  "exercise",
-  "walk",
-  "distraction",
-  "other",
-];
+const BREAK_CATEGORIES: readonly BreakCategory[] = QUICK_BREAK_CATEGORIES;
 
 export async function runStart(
   ctx: CommandContext,
