@@ -188,7 +188,7 @@ The big 7-segment counter is scaled "reserve-first" — it gets ample vertical
 space before the surrounding metadata, so it never appears cramped:
 
 ```
- Flowclock Dashboard   12:23:28   [1:Session]  2:Overview  3:Sessions  4:Goals  5:Breaks  6:Help
+ Flowclock   12:23:28   [1:Session]  2:Overview  3:Sessions  4:Goals  5:Breaks  6:Help
  ╔══════════════════════════════════════════════════════════╗
  ║  Deep work — StreamNet                                   ║
  ║                                                          ║
@@ -199,9 +199,12 @@ space before the surrounding metadata, so it never appears cramped:
  ║    ████  ███ ████ ████      █ ████                       ║
  ║                                                          ║
  ║  goal · 42m/1h ███████░░░ 70%   break 06:00/20:00 · ratio 1:7.0   ║
- ║  [p] pause  [b] break  [1-6] category  [r] reset  [q] stop & save ║
  ╚══════════════════════════════════════════════════════════╝
+       [p] pause · [b] break · [c] cat · [e] edit · [x] cancel · [q] stop
 ```
+
+The control row lives in the **centered footer** below the panel (trimmed to the
+essentials so it fits and centers in a small terminal — `[6] Help` lists them all).
 
 Live session controls inside the dashboard:
 
@@ -210,14 +213,17 @@ Live session controls inside the dashboard:
 | `p` | Pause / resume |
 | `b` | Start / end a break |
 | `1`–`6` | Pick a quick break category (rest · meal · exercise · walk · distraction · other) |
-| `m` | Open the break-category picker — **all** categories, incl. **coffee** and **sleep** |
+| `c` | Open the break-category **picker** — **all** categories, incl. **coffee** and **sleep** |
+| `e` | **Edit** the running session — goal, details, focus target, break budget (timer keeps counting) |
 | `x` | **Cancel** the session (discard without saving — confirmed first) |
 | `r` | Reset the session clock |
+| `z` | Zen — hide metadata, big clock only |
+| `Enter` | Hide / show the control footer |
 | `q` | Stop & **save** the session (a summary shows, then the Session view) |
 
 `q` saves, `x` discards. The full category set is `rest · meal · exercise ·
 walk · distraction · other · coffee · sleep`; keys `1`–`6` stay bound to the
-first six so the footer stays short, and `[m]` reaches the rest.
+first six so the footer stays short, and **`[c]`** opens a picker for the rest.
 
 ### Starting a session — the in-dashboard form
 
@@ -252,7 +258,17 @@ flowclock start --goal "Deep work — StreamNet" --target 1h --break-budget 20m
 Every text field is a real editor: move with **← →**, **Home**/**End**, delete
 around the cursor with **Backspace**/**Del**, and **paste** clipboard text
 (multi-line pastes are flattened to one line). The same applies to the edit
-overlay (`[e]` on the Sessions view).
+overlays — `[e]` on the Sessions view (logged sessions) and `[e]` during a live
+session (see below).
+
+### Editing a running session — `[e]`
+
+Sometimes you just want to **start the clock** before you've decided exactly what
+you're doing. Begin a plain session, then press **`e`** at any point to open the
+same form, pre-filled with the current goal, details, focus target and break
+budget. Adjust anything, press **`Enter`**, and the changes apply **without
+stopping the timer** — the session keeps counting and the crash-recovery journal
+picks up the new metadata immediately. **`Esc`** discards the edit.
 
 ### Cancelling a session — `[x]` (discard) vs `[q]` (save)
 
@@ -357,7 +373,7 @@ flowclock dashboard --json   # emits DashboardSnapshot, never launches the TUI
 ```
 
 ```
- Flowclock Dashboard   12:23:28   [1:Overview]  2:Sessions  3:Goals  4:Breaks
+ Flowclock   12:23:28   [1:Overview]  2:Sessions  3:Goals  4:Breaks
  ┌─ Today ───────────────────────┐ ┌─ Flow ──────────────────────────────┐
  │ Focus     1h 45m   2 sessions │ │ Flow score   ████████░░░░  58/100   │
  │ Break        12m   ratio 8.8:1│ │ Daily goal   ████░░░░░░░░  44% (4h)  │
@@ -491,7 +507,8 @@ on-disk schema is **v3**; migrations are non-destructive.
 | **v3.5.1** ✅ | `classic` lightened to `░` shade so block `█` / classic `░` / bold `▓` read as three distinct surfaces while keeping exact 5-row footprint parity |
 | **v3.6.0** ✅ | `classic`/`bold` redesigned as native 5-row fonts with distinct glyph shapes (cornered `classic` / heavy-slab `bold`, both solid) — replaces the v3.5.x shade-fill approach so the three solid styles read as clearly distinct while keeping exact footprint parity |
 | **v3.7.0** ✅ | Session editing — in-dashboard `[e]` overlay (view 3 · Sessions) and `flowclock edit <id>` CLI; editable fields: focus, break total, goal, details; start immutable; end + break timeline recompute automatically |
-| **v3.8.0** ✅ | Crash recovery (resume an interrupted session); `[x]` cancel-without-saving; `coffee` + `sleep` break categories with an `[m]` picker; full line editors (cursor + paste) in every text field; "Name" → "Details" (CLI `--details`, `--name`/`--label` kept as aliases) |
+| **v3.8.0** ✅ | Crash recovery (resume an interrupted session); `[x]` cancel-without-saving; `coffee` + `sleep` break categories with a picker; full line editors (cursor + paste) in every text field; "Name" → "Details" (CLI `--details`, `--name`/`--label` kept as aliases) |
+| **v3.9.0** ✅ | Edit a **running** session with `[e]` (goal/details/target/budget, timer keeps counting); break-category picker moved to **`[c]`** (was `[m] more`); centered, compact session footer; header reads **Flowclock** (dropped the "Dashboard" suffix) |
 | **next** | `flowclock sync` — push `sessions.json` to a self-hosted/cloud endpoint; recurring goals; dashboard filters |
 | **later** | Per-goal analytics deep-dives, calendar heatmap, Homebrew tap |
 

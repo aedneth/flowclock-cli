@@ -6,6 +6,34 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [3.9.0] - 2026-06-17
+
+### Added
+
+- **Edit a session while it runs — `[e]`.** During a live session, **`[e]`** opens
+  the session form pre-filled with the current goal, details, focus target and
+  break budget. Adjust anything and press **`Enter`** — the changes apply **without
+  stopping the timer**, and the crash-recovery journal is re-seeded immediately so
+  the new metadata survives an interruption. **`Esc`** discards the edit. This is
+  the "just start the clock, decide what I'm doing mid-flow" workflow. The form is
+  the existing new-session form reused in an `"edit"` mode.
+
+### Changed
+
+- **Break-category picker is now `[c]` (was `[m]` "more").** The label "more"
+  carried no meaning; **`[c]`** ("categories") opens the picker in both states —
+  off break, picking a category starts a break in it; on break, it switches the
+  current category. The old `[c]` cycle-through-categories binding is removed (the
+  picker supersedes it). Quick keys **`1`–`6`** are unchanged.
+- **Centered, compact session footer.** The live control row is centered and
+  trimmed to the essentials (`[p] pause · [b] break · [c] cat · [e] edit ·
+  [x] cancel · [q] stop`) so it actually fits and centers in a small terminal —
+  the full keymap stays in **`[6]` Help**. `z` (zen), `Enter` (hide), `Tab`
+  (views), `r` (reset) and `1`–`6` all still work; they're just no longer crowding
+  the footer. All footer rows are now centered.
+- **Header reads "Flowclock" (dropped "Dashboard").** It's already an interactive
+  dashboard; the second word was redundant.
+
 ## [3.8.0] - 2026-06-15
 
 ### Added
