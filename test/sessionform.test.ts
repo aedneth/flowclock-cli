@@ -154,3 +154,55 @@ describe("renderSessionForm", () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// Edit mode (v3.9.0 — editing a running session)
+// ---------------------------------------------------------------------------
+
+describe("sessionForm — edit mode", () => {
+  it("defaults to create mode with no args (back-compat)", () => {
+    expect(openSessionFormState().mode).toBe("create");
+    expect(emptySessionFormState().mode).toBe("create");
+  });
+
+  it("opens in edit mode pre-filled with the supplied values", () => {
+    const s = openSessionFormState({
+      mode: "edit",
+      values: { goal: "Deep work", label: "Korvex", target: "1h30m", break: "20m" },
+    });
+    expect(s.open).toBe(true);
+    expect(s.mode).toBe("edit");
+    expect(s.values).toEqual({ goal: "Deep work", label: "Korvex", target: "1h30m", break: "20m" });
+  });
+
+  it("fills only the provided fields, leaving the rest blank", () => {
+    const s = openSessionFormState({ mode: "edit", values: { goal: "Just work" } });
+    expect(s.values).toEqual({ goal: "Just work", label: "", target: "", break: "" });
+  });
+
+  it("preserves the mode through editing keystrokes", () => {
+    let s = openSessionFormState({ mode: "edit", values: { goal: "x" } });
+    s = sessionFormApplyKey(s, ch("y")).state;
+    s = sessionFormApplyKey(s, { name: "tab" }).state;
+    expect(s.mode).toBe("edit");
+  });
+
+  it("submit carries the current values regardless of mode", () => {
+    const s = openSessionFormState({ mode: "edit", values: { goal: "g", label: "", target: "", break: "" } });
+    const r = sessionFormApplyKey(s, { name: "enter" });
+    expect(r.action).toEqual({ type: "submit", values: { goal: "g", label: "", target: "", break: "" } });
+  });
+
+  it("renders 'Edit session' title and '[Enter] save' footer in edit mode", () => {
+    const joined = renderSessionForm(
+      openSessionFormState({ mode: "edit", values: { goal: "g" } }),
+      80,
+      24,
+      "neon",
+      false,
+    ).rows.join("\n");
+    expect(joined).toContain("Edit session");
+    expect(joined).toContain("[Enter] save");
+    expect(joined).not.toContain("New session");
+  });
+});

@@ -1,6 +1,6 @@
 {
   "name": "flowclock-cli",
-  "version": "3.8.0",
+  "version": "3.9.0",
   "description": "Flowtime count-up terminal timer (HUD, not Pomodoro) with silent session logging — agent-native, like gh and vercel.",
   "type": "module",
   "license": "AGPL-3.0-or-later",
@@ -63,6 +63,9 @@
     "commander": "^13.1.0",
     "env-paths": "^3.0.0",
     "zod": "^3.25.0"
+  },
+  "overrides": {
+    "hono": ">=4.12.25"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",

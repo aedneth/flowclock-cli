@@ -1,10 +1,13 @@
 /**
- * New-session form — a pure, self-contained, transient overlay for the TUI
- * dashboard. Lets the user pick a goal, name, focus target and break budget
- * for a session WITHOUT dropping to the shell, then start it in the dashboard.
+ * Session form — a pure, self-contained, transient overlay for the TUI
+ * dashboard. Lets the user set a goal, details, focus target and break budget
+ * WITHOUT dropping to the shell. Used in two modes:
+ *   - "create": start a brand-new session in the dashboard.
+ *   - "edit":   adjust the goal/details/target/budget of the LIVE session that
+ *               is already running (the timer keeps counting).
  *
  * Mirrors the palette's design: types + pure functions only, no I/O. The caller
- * (app.ts) does the wiring (parsing durations, creating the Timer, etc.).
+ * (app.ts) does the wiring (parsing durations, creating/mutating the Timer).
  */
 
 import type { Key } from "../lib/tui/input.js";
@@ -41,8 +44,12 @@ const LABEL_WIDTH = 13; // "Break budget" is the longest label
 // State
 // ---------------------------------------------------------------------------
 
+/** "create" starts a new session; "edit" mutates the running one. */
+export type SessionFormMode = "create" | "edit";
+
 export interface SessionFormState {
   open: boolean;
+  mode: SessionFormMode;
   values: SessionFormValues;
   active: number; // index into SESSION_FORM_FIELDS
   /** Cursor position (code units) within the active field's value. */
@@ -54,6 +61,7 @@ export interface SessionFormState {
 export function emptySessionFormState(): SessionFormState {
   return {
     open: false,
+    mode: "create",
     values: { goal: "", label: "", target: "", break: "" },
     active: 0,
     cursor: 0,
@@ -61,9 +69,20 @@ export function emptySessionFormState(): SessionFormState {
   };
 }
 
-/** Open a fresh form. */
-export function openSessionFormState(): SessionFormState {
-  return { ...emptySessionFormState(), open: true };
+/**
+ * Open a form. With no args it opens a blank "create" form (back-compat). Pass
+ * `mode: "edit"` and pre-filled `values` to edit a running session.
+ */
+export function openSessionFormState(
+  opts: { mode?: SessionFormMode; values?: Partial<SessionFormValues> } = {},
+): SessionFormState {
+  const base = emptySessionFormState();
+  return {
+    ...base,
+    open: true,
+    mode: opts.mode ?? "create",
+    values: { ...base.values, ...opts.values },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -196,14 +215,15 @@ export function renderSessionForm(
     body.push(truncate("  ⚠ " + state.error, innerW));
   }
 
-  // Spacer + footer
+  // Spacer + footer (verb depends on mode)
   body.push(padTo("", innerW));
-  body.push(truncate("  [Tab] next · [Enter] start · [Esc] cancel", innerW));
+  const verb = state.mode === "edit" ? "save" : "start";
+  body.push(truncate(`  [Tab] next · [Enter] ${verb} · [Esc] cancel`, innerW));
 
   const boxHeight = body.length + 2; // 2 borders
 
   const panelRows = panel({
-    title: "New session",
+    title: state.mode === "edit" ? "Edit session" : "New session",
     width: boxWidth,
     height: boxHeight,
     body,

@@ -27,7 +27,7 @@ import { renderBreaks } from "../src/tui/views/breaks.js";
 import { buildFrame, compositeOverlay } from "../src/tui/app.js";
 import type { LiveSession, ViewName } from "../src/tui/app.js";
 import { emptyPaletteState } from "../src/tui/palette.js";
-import { emptySessionFormState } from "../src/tui/sessionform.js";
+import { emptySessionFormState, openSessionFormState } from "../src/tui/sessionform.js";
 import { emptyEditFormState, openEditFormState } from "../src/tui/editform.js";
 import { emptyConfirmState, openConfirmState } from "../src/tui/confirm.js";
 import { emptyBreakPickerState, openBreakPickerState } from "../src/tui/breakpicker.js";
@@ -768,10 +768,11 @@ describe("buildFrame (WS5)", () => {
     };
   }
 
-  it("live footer shows [z] zen and [Enter] hide hints", () => {
+  it("live footer shows compact controls (pause, break, cat, edit, cancel, stop)", () => {
     const out = buildFrame(fcState(), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
-    expect(out).toContain("zen");
-    expect(out).toContain("hide");
+    for (const hint of ["pause", "break", "cat", "edit", "cancel", "stop"]) {
+      expect(out).toContain(hint);
+    }
   });
 
   it("hideControls blanks the footer controls (no 'pause')", () => {
@@ -779,11 +780,56 @@ describe("buildFrame (WS5)", () => {
     expect(out).not.toContain("pause");
   });
 
-  // ── v3.8.0: live footer advertises the picker + cancel controls ────────────
-  it("live footer shows [m] (picker) and [x] cancel", () => {
+  // ── v3.9.0: [c] opens the category picker; [e] edits the live session ──────
+  it("live footer shows [c] cat and [e] edit (no legacy [m] more)", () => {
     const out = buildFrame(fcState(), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
-    expect(out).toContain("[m]");
-    expect(out).toContain("cancel");
+    expect(out).toContain("[c] cat");
+    expect(out).toContain("[e] edit");
+    expect(out).not.toContain("[m]");
+  });
+
+  // ── v3.9.0: footer is centered (leading padding before the controls) ──────
+  it("centers the footer control row", () => {
+    const rows = buildFrame(fcState(), 100, 24, makeFakeCtx()).map(stripAnsi);
+    const footer = rows.find((r) => r.includes("[p] pause"));
+    expect(footer).toBeDefined();
+    const leading = footer!.length - footer!.trimStart().length;
+    expect(leading).toBeGreaterThan(0);
+  });
+
+  // ── v3.9.0: on-break footer advertises [c] cat, resume and [e] edit ───────
+  it("on-break footer shows [c] cat, resume and [e] edit", () => {
+    const t = new Timer();
+    t.startBreak("rest", null, null);
+    const live: LiveSession = {
+      timer: t, goal: "g", label: null, focusTargetS: null, breakBudgetS: null,
+    };
+    const out = buildFrame(fcState({ live }), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).toContain("[c] cat");
+    expect(out).toContain("resume");
+    expect(out).toContain("[e] edit");
+  });
+
+  // ── v3.9.0: header drops the redundant "Dashboard" suffix ─────────────────
+  it("header reads 'Flowclock' without the 'Dashboard' suffix", () => {
+    const out = buildFrame(fcState(), 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).toContain("Flowclock");
+    expect(out).not.toContain("Flowclock Dashboard");
+  });
+
+  // ── v3.9.0: editing the running session composites an "Edit session" form ──
+  it("live-edit form overlay shows 'Edit session', the pre-filled value and save footer", () => {
+    const state = {
+      ...fcState(),
+      form: openSessionFormState({
+        mode: "edit" as const,
+        values: { goal: "Korvex", label: "", target: "1h", break: "20m" },
+      }),
+    };
+    const out = buildFrame(state, 100, 24, makeFakeCtx()).map(stripAnsi).join("\n");
+    expect(out).toContain("Edit session");
+    expect(out).toContain("Korvex");
+    expect(out).toContain("[Enter] save");
   });
 
   // ── v3.8.0: break-category picker overlay composites over the frame ────────
