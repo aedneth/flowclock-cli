@@ -1,7 +1,7 @@
 /**
  * Break-category picker — a pure, self-contained transient overlay for the live
  * session view. It lets the user pick any category from ALL_BREAK_CATEGORIES
- * (the "more" picker that unlocks coffee/sleep beyond the 1–6 quick keys).
+ * (the [c] categories picker that unlocks coffee/sleep beyond the 1–6 quick keys).
  *
  * Mirrors the confirm/palette design: types + pure functions only, no I/O. The
  * caller (app.ts) wires the action that runs on pick/cancel.
