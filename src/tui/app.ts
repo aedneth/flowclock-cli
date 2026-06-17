@@ -11,7 +11,7 @@
 import type { CommandContext } from "../lib/context.js";
 import type { Session } from "../schemas/session.js";
 import type { ThemeName, DisplayStyle } from "../schemas/config.js";
-import { ALL_BREAK_CATEGORIES, QUICK_BREAK_CATEGORIES } from "../schemas/session.js";
+import { QUICK_BREAK_CATEGORIES } from "../schemas/session.js";
 import type { BreakCategory } from "../schemas/session.js";
 import { buildSnapshot } from "../lib/snapshot.js";
 import { readSessions, appendSession, deleteSession, updateSession } from "../lib/session.js";
@@ -100,7 +100,7 @@ const VIEW_LABELS: Record<ViewName, string> = {
 };
 
 /** Ordered break categories — digit keys 1..6 map to this array. The full set
- * (incl. coffee/sleep) is reachable via the break-category picker ([m]). */
+ * (incl. coffee/sleep) is reachable via the break-category picker ([c]). */
 const BREAK_CATEGORIES: readonly BreakCategory[] = QUICK_BREAK_CATEGORIES;
 
 /** All available themes in cycle order. */
@@ -144,7 +144,7 @@ interface AppState {
   form: SessionFormState;
   edit: EditFormState;
   confirm: ConfirmState;
-  /** Break-category picker overlay ([m] during a live session). */
+  /** Break-category picker overlay ([c] during a live session). */
   breakpicker: BreakPickerState;
   /** Resume-previous-session overlay (shown at launch after a crash). */
   resume: ResumeState;
@@ -263,8 +263,8 @@ export function buildFrame(
       : ` ${VIEW_LABELS[v]} `,
   ).join(" ");
   const title = color
-    ? paint("Flowclock Dashboard", theme, true)
-    : "Flowclock Dashboard";
+    ? paint("Flowclock", theme, true)
+    : "Flowclock";
 
   // Live indicator appended to headerRight when a session is running
   let headerRight: string;
@@ -382,7 +382,8 @@ export function buildFrame(
   } else if (state.breakpicker.open) {
     footerHints = "[↑↓] select · [1-8] pick · [Enter] choose · [Esc] cancel";
   } else if (state.form.open) {
-    footerHints = "[Tab] next field · [Enter] start · [Esc] cancel";
+    const verb = state.form.mode === "edit" ? "save" : "start";
+    footerHints = `[Tab] next field · [Enter] ${verb} · [Esc] cancel`;
   } else if (state.edit.open) {
     footerHints = "[Tab] next field · [Enter] save · [Esc] cancel";
   } else if (state.palette.open) {
@@ -393,10 +394,11 @@ export function buildFrame(
       footerHints = "";
     } else {
       const kb = ctx.config.keybindings;
+      const cat = kb.category ?? "c";
       if (state.live.timer.isOnBreak) {
-        footerHints = `[1-6] cat · [m] more · [${kb.break}] resume · [Enter] hide`;
+        footerHints = `[${cat}] cat · [${kb.break}] resume · [e] edit · [Enter] hide`;
       } else {
-        footerHints = `[${kb.pause}] pause · [${kb.break}] break · [1-6]/[m] cat · [x] cancel · [z] zen · [Enter] hide · [${kb.quit}] stop · [Tab] views`;
+        footerHints = `[${kb.pause}] pause · [${kb.break}] break · [${cat}] cat · [e] edit · [x] cancel · [${kb.quit}] stop`;
       }
     }
   } else if (state.live) {
@@ -406,7 +408,7 @@ export function buildFrame(
   } else {
     footerHints = "[Tab] views · [s] start · [/] commands · [d] style · [t] theme · [q] quit";
   }
-  const footerLine = padTo(footerHints, cols);
+  const footerLine = padTo(footerHints, cols, "center");
   if (footerRect) frame.push(footerLine);
 
   // Ensure exactly `rows` lines (pad if needed)
@@ -850,6 +852,57 @@ export async function runDashboardApp(
     }
 
     /**
+     * Open the session form in EDIT mode over the RUNNING session, pre-filled
+     * with its current goal/details and target/budget (compact, parser-friendly).
+     * Lets you start a session "blind" and fill in what you're doing mid-flow.
+     */
+    function openLiveEditForm() {
+      if (!state.live) return;
+      const live = state.live;
+      state.form = openSessionFormState({
+        mode: "edit",
+        values: {
+          goal: live.goal ?? "",
+          label: live.label ?? "",
+          target: live.focusTargetS != null ? compactDuration(live.focusTargetS) : "",
+          break: live.breakBudgetS != null ? compactDuration(live.breakBudgetS) : "",
+        },
+      });
+      state.view = "session";
+      render();
+    }
+
+    /**
+     * Apply the form's values to the LIVE session (goal/details/target/budget).
+     * The timer keeps running; on a duration parse error, surface it and stay
+     * open. Re-seeds the crash-recovery journal so the new metadata survives.
+     */
+    function applyLiveEdit(values: SessionFormValues) {
+      if (!state.live) return;
+      let focusTargetS: number | null = null;
+      let breakBudgetS: number | null = null;
+      try {
+        if (values.target.trim()) focusTargetS = parseDurationToS(values.target);
+        if (values.break.trim()) breakBudgetS = parseDurationToS(values.break);
+      } catch (err) {
+        state.form = { ...state.form, error: (err as Error).message };
+        render();
+        return;
+      }
+      state.live = {
+        ...state.live,
+        goal: values.goal.trim() || null,
+        label: values.label.trim() || null,
+        focusTargetS,
+        breakBudgetS,
+      };
+      state.form = emptySessionFormState();
+      state.view = "session";
+      writeLiveJournal();
+      render();
+    }
+
+    /**
      * Open the edit form for the currently-selected session, pre-filled with its
      * goal/name and its focus/break totals in a parser-friendly compact form.
      */
@@ -1049,11 +1102,18 @@ export async function runDashboardApp(
 
       // ── (1b) New-session form: feed keys to its reducer ───────────────────
       if (state.form.open) {
-        // Ctrl-C aborts the form and exits cleanly (no live session yet).
+        // Ctrl-C: create mode has no session yet → exit cleanly; edit mode has a
+        // session running → just close the form and leave it counting.
         if (key.name === "char" && key.char === CTRL_C) {
-          cleanup();
+          if (state.form.mode === "edit") {
+            state.form = emptySessionFormState();
+            render();
+          } else {
+            cleanup();
+          }
           return;
         }
+        const mode = state.form.mode;
         const result = sessionFormApplyKey(state.form, key);
         state.form = result.state;
         if (result.action?.type === "cancel") {
@@ -1061,7 +1121,8 @@ export async function runDashboardApp(
           return;
         }
         if (result.action?.type === "submit") {
-          startSessionFromForm(result.action.values);
+          if (mode === "edit") applyLiveEdit(result.action.values);
+          else startSessionFromForm(result.action.values);
           return;
         }
         render();
@@ -1090,7 +1151,7 @@ export async function runDashboardApp(
         return;
       }
 
-      // ── (1d) Break-category picker ([m]): pick from ALL categories ─────────
+      // ── (1d) Break-category picker ([c]): pick from ALL categories ─────────
       if (state.breakpicker.open) {
         // Ctrl-C closes the picker without exiting the app.
         if (key.name === "char" && key.char === CTRL_C) {
@@ -1182,12 +1243,9 @@ export async function runDashboardApp(
             return;
           }
 
-          // [m] — open the picker for ALL categories (incl. coffee/sleep).
-          if (ch === "m") {
-            state.breakpicker = openBreakPickerState(
-              live.timer.isOnBreak ? live.timer.currentBreakCategory : undefined,
-            );
-            render();
+          // [e] — edit the running session's goal/details/target/budget live.
+          if (ch === "e") {
+            openLiveEditForm();
             return;
           }
 
@@ -1215,15 +1273,13 @@ export async function runDashboardApp(
             return;
           }
 
-          if (ch === (ctx.config.keybindings.category ?? "c")) {
-            if (live.timer.isOnBreak) {
-              const current = live.timer.currentBreakCategory;
-              const idx = ALL_BREAK_CATEGORIES.indexOf(current);
-              const next =
-                ALL_BREAK_CATEGORIES[(idx + 1) % ALL_BREAK_CATEGORIES.length] ?? "rest";
-              live.timer.setBreakCategory(next);
-              writeLiveJournal();
-            }
+          // [c] — open the category picker (all categories, incl. coffee/sleep).
+          // On break it pre-selects the current category; off break, picking one
+          // starts a break in that category.
+          if (ch === (kb.category ?? "c")) {
+            state.breakpicker = openBreakPickerState(
+              live.timer.isOnBreak ? live.timer.currentBreakCategory : undefined,
+            );
             render();
             return;
           }

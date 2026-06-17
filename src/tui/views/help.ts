@@ -41,9 +41,9 @@ export function renderHelp(rect: Rect, theme: ThemeName, color: boolean): string
 
   // Session controls
   body.push(padTo("Session controls (while a session runs):", innerW));
-  body.push(padTo("p pause · b break · 1-6 quick category · m more categories · x cancel · z zen · Enter hide · r reset · q stop & save", innerW));
-  body.push(padTo("quick: 1 rest · 2 meal · 3 exercise · 4 walk · 5 distraction · 6 other   ·   m picker adds: coffee · sleep", innerW));
-  body.push(padTo("x cancels without saving (test sessions); q stops & saves.", innerW));
+  body.push(padTo("p pause · b break · 1-6 quick category · c categories · e edit · x cancel · z zen · Enter hide · r reset · q stop & save", innerW));
+  body.push(padTo("quick: 1 rest · 2 meal · 3 exercise · 4 walk · 5 distraction · 6 other   ·   c picker adds: coffee · sleep", innerW));
+  body.push(padTo("e edits goal/details/target/budget mid-session; x cancels without saving (test sessions); q stops & saves.", innerW));
 
   // Spacer
   body.push("");
